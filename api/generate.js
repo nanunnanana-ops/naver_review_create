@@ -47,10 +47,8 @@ export default async function handler(req, res) {
       reviews = await generateWithHuggingFace(menuText, sideText, keywordsText, storeName, targetLength, huggingFaceKey);
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
-      return res.status(500).json({ 
-        error: 'API 키가 설정되지 않았습니다.',
-        message: 'GEMINI_API_KEY 또는 HUGGING_FACE_API_KEY를 환경 변수에 설정해주세요.'
-      });
+      console.warn('API 키가 없어 템플릿 기반 생성 사용');
+      reviews = generateFallbackReviews(menuText, sideText, keywordsBundle);
     }
 
     // 최소 3개 리뷰 보장
@@ -157,6 +155,46 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ''}
     console.error('Gemini API error:', error);
     throw error;
   }
+}
+
+// ========== 템플릿 기반 폴백 ==========
+function generateFallbackReviews(menuText, sideText, keywordsBundle) {
+  const templates = [
+    () => {
+      const k1 = keywordsBundle[0] || '맛있었어요';
+      const k2 = keywordsBundle[1] || '좋았어요';
+      if (sideText) {
+        return `${menuText} 먹었는데 ${k1}하고 ${k2}했어요. ${sideText}도 괜찮았습니다.`;
+      }
+      return `${menuText} 먹었는데 ${k1}하고 ${k2}했어요. 다음에 또 올게요.`;
+    },
+    () => {
+      const k1 = keywordsBundle[0] || '맛있었어요';
+      if (sideText) {
+        return `${menuText} 주문했어요. ${k1}하고 ${sideText}도 함께 먹으니 좋았습니다.`;
+      }
+      return `${menuText} 주문했어요. ${k1}해서 만족스러웠어요.`;
+    },
+    () => {
+      const k1 = keywordsBundle[0] || '괜찮았어요';
+      const k2 = keywordsBundle[1] || '좋았어요';
+      if (sideText) {
+        return `${menuText} 시켰는데 ${k1}했어요. ${sideText}도 ${k2}습니다.`;
+      }
+      return `${menuText} 시켰는데 ${k1}했어요. ${k2}습니다.`;
+    }
+  ];
+
+  return templates.map(template => {
+    let review = template();
+    // 35글자 내외로 조정
+    if (review.length < 30) {
+      review = review + ' 다음에도 올게요.';
+    } else if (review.length > 40) {
+      review = review.substring(0, 37) + '...';
+    }
+    return review;
+  });
 }
 
 // ========== Hugging Face Inference API ==========

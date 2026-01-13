@@ -152,11 +152,17 @@ async function handleGenerate() {
       });
 
       if (!response.ok) {
-        throw new Error('리뷰 생성에 실패했습니다.');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('API error:', errorData);
+        throw new Error(errorData.message || errorData.error || '리뷰 생성에 실패했습니다.');
       }
 
       const data = await response.json();
       reviews = data.reviews || [];
+      
+      if (!reviews || reviews.length === 0) {
+        throw new Error('리뷰가 생성되지 않았습니다.');
+      }
 
       // 유사도 검사 및 재요청
       let attempts = 0;

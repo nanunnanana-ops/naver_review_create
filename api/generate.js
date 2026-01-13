@@ -123,7 +123,11 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ''}
           parts: [{
             text: prompt
           }]
-        }]
+        }],
+        generationConfig: {
+          maxOutputTokens: 2000,
+          temperature: 0.8
+        }
       })
     });
 
@@ -197,10 +201,21 @@ function generateFallbackReviews(menuText, sideText, keywordsBundle) {
   return templates.map(template => {
     let review = template();
     // 200~400글자 내외로 조정
-    if (review.length < 30) {
-      review = review + ' 다음에도 올게요.';
-    } else if (review.length > 40) {
-      review = review.substring(0, 37) + '...';
+    while (review.length < 200) {
+      const additions = [
+        ' 다음에도 방문할 예정입니다.',
+        ' 가격 대비 만족스러웠어요.',
+        ' 친구들에게도 추천하고 싶습니다.',
+        ' 분위기도 좋고 맛도 좋았습니다.',
+        ' 사장님도 친절하시고 음식도 맛있었어요.',
+        ' 자주 찾을 수 있을 것 같습니다.',
+        ' 주변에 소개하고 싶은 맛집입니다.'
+      ];
+      const addition = additions[Math.floor(Math.random() * additions.length)];
+      review = review + addition;
+    }
+    if (review.length > 400) {
+      review = review.substring(0, 397) + '...';
     }
     return review;
   });

@@ -152,15 +152,26 @@ async function handleGenerate() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('API error:', errorData);
-        throw new Error(errorData.message || errorData.error || '리뷰 생성에 실패했습니다.');
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Unknown error' };
+        }
+        console.error('API error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(errorData.message || errorData.error || `리뷰 생성에 실패했습니다. (${response.status})`);
       }
 
       const data = await response.json();
       reviews = data.reviews || [];
       
       if (!reviews || reviews.length === 0) {
+        console.error('No reviews in response:', data);
         throw new Error('리뷰가 생성되지 않았습니다.');
       }
 
@@ -194,7 +205,9 @@ async function handleGenerate() {
     displayReviews(reviews);
   } catch (error) {
     console.error('Generate error:', error);
-    showToast('리뷰 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+    const errorMessage = error.message || '리뷰 생성 중 오류가 발생했습니다.';
+    console.error('Error details:', error);
+    showToast(`${errorMessage} 다시 시도해주세요.`);
   } finally {
     generateBtn.textContent = originalText;
     generateBtn.disabled = false;

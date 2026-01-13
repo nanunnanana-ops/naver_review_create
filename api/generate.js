@@ -48,6 +48,8 @@ export default async function handler(req, res) {
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn('API 키가 없어 템플릿 기반 생성 사용');
+      console.warn('GEMINI_API_KEY:', geminiKey ? '있음 (마스킹됨)' : '없음');
+      console.warn('HUGGING_FACE_API_KEY:', huggingFaceKey ? '있음 (마스킹됨)' : '없음');
       reviews = generateFallbackReviews(menuText, sideText, keywordsBundle);
     }
 
@@ -86,9 +88,11 @@ export default async function handler(req, res) {
     return res.status(200).json({ reviews });
   } catch (error) {
     console.error('API error:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: '리뷰 생성에 실패했습니다.',
-      message: error.message 
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

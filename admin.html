@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 설정</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- PIN 입력 모달 -->
+  <div class="modal active" id="pinModal">
+    <div class="modal-content">
+      <h2>관리자 페이지</h2>
+      <p>PIN을 입력하세요</p>
+      <input type="password" class="modal-input" id="pinInput" maxlength="10" placeholder="PIN 입력">
+      <button class="btn btn-primary" id="pinSubmitBtn">확인</button>
+      <p id="pinError" style="color: #C0362C; font-size: 14px; margin-top: 10px; display: none;">잘못된 PIN입니다.</p>
+    </div>
+  </div>
+
+  <!-- 설정 폼 (PIN 통과 후 표시) -->
+  <div class="container" id="adminContainer" style="display: none;">
+    <header class="header">
+      <h1>관리자 설정</h1>
+      <p>리뷰 생성기 설정을 수정할 수 있습니다</p>
+    </header>
+
+    <section class="admin-section">
+      <h2>매장명</h2>
+      <input type="text" id="storeName" class="form-group" style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px;">
+    </section>
+
+    <section class="admin-section">
+      <h2>필수 키워드</h2>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">항상 리뷰에 포함될 키워드 (쉼표로 구분)</p>
+      <textarea id="requiredKeywords" placeholder="예: 어국수, 국물"></textarea>
+    </section>
+
+    <section class="admin-section">
+      <h2>프로모션 키워드 풀</h2>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">랜덤으로 선택될 키워드들 (쉼표로 구분)</p>
+      <textarea id="promoKeywordsPool" placeholder="예: 시원, 깔끔, 매콤, 어묵국수"></textarea>
+    </section>
+
+    <section class="admin-section">
+      <h2>메뉴 리스트</h2>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">메뉴 목록 (줄바꿈 또는 쉼표로 구분)</p>
+      <textarea id="menus" placeholder="예: 어묵국수&#10;얼큰바지락국수&#10;소갈비국수"></textarea>
+    </section>
+
+    <section class="admin-section">
+      <h2>사이드 메뉴 리스트</h2>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">함께 먹은 것 옵션 (줄바꿈 또는 쉼표로 구분)</p>
+      <textarea id="sides" placeholder="예: 소주, 맥주, 김치전, 부추전, 없음"></textarea>
+    </section>
+
+    <section class="admin-section">
+      <h2>UI 설정</h2>
+      <div class="form-group">
+        <label for="themeBg">배경색</label>
+        <input type="color" id="themeBg" style="width: 100%; height: 44px; border: 2px solid var(--border); border-radius: 8px;">
+      </div>
+      <div class="form-group">
+        <label for="accent">강조색</label>
+        <input type="color" id="accent" style="width: 100%; height: 44px; border: 2px solid var(--border); border-radius: 8px;">
+      </div>
+      <div class="form-group">
+        <label for="subtitle">부제목</label>
+        <input type="text" id="subtitle" style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px;">
+      </div>
+    </section>
+
+    <div class="admin-actions">
+      <button class="btn btn-primary" id="saveLocalBtn">저장 (로컬)</button>
+      <button class="btn btn-secondary" id="downloadBtn">설정 JSON 다운로드</button>
+      <button class="btn btn-secondary" id="resetBtn">설정 초기화</button>
+    </div>
+  </div>
+
+  <script src="shared.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

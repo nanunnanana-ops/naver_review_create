@@ -1,0 +1,219 @@
+/**
+ * Vercel Serverless Function
+ * Google Gemini API를 사용하여 리뷰 생성 (무료 티어 제공)
+ * 
+ * 무료 옵션:
+ * 1. Google Gemini API - 월 60회 무료 (권장)
+ * 2. Hugging Face Inference API - 완전 무료 (제한적)
+ */
+
+export default async function handler(req, res) {
+  // CORS 헤더 설정
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { storeName, menus, sides, keywordsBundle, targetLength, nonce } = req.body;
+
+    if (!menus || menus.length === 0) {
+      return res.status(400).json({ error: '메뉴가 필요합니다' });
+    }
+
+    // 메뉴 텍스트 생성
+    const menuText = menus.length === 1 ? menus[0] : menus.join('과 ');
+    const sideText = sides && sides.length > 0 ? sides.join(', ') : '';
+    const keywordsText = keywordsBundle.join(', ');
+
+    // API 선택: GEMINI_API_KEY가 있으면 Gemini, 없으면 Hugging Face
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const huggingFaceKey = process.env.HUGGING_FACE_API_KEY;
+
+    let reviews = [];
+
+    if (geminiKey) {
+      // Google Gemini API 사용
+      reviews = await generateWithGemini(menuText, sideText, keywordsText, storeName, targetLength, geminiKey);
+    } else if (huggingFaceKey) {
+      // Hugging Face Inference API 사용
+      reviews = await generateWithHuggingFace(menuText, sideText, keywordsText, storeName, targetLength, huggingFaceKey);
+    } else {
+      // API 키가 없으면 템플릿 기반 생성 (폴백)
+      return res.status(500).json({ 
+        error: 'API 키가 설정되지 않았습니다.',
+        message: 'GEMINI_API_KEY 또는 HUGGING_FACE_API_KEY를 환경 변수에 설정해주세요.'
+      });
+    }
+
+    // 최소 3개 리뷰 보장
+    if (reviews.length < 3) {
+      const templates = [
+        `${menuText} 먹었는데 맛있었어요. ${keywordsBundle[0] || '좋았어요'}.`,
+        `${menuText} 주문했어요. ${keywordsBundle[1] || '만족스러웠어요'}.`,
+        `${menuText} 시켰는데 ${keywordsBundle[2] || '괜찮았어요'}.`
+      ];
+      while (reviews.length < 3) {
+        reviews.push(templates[reviews.length] || `${menuText} 먹었어요.`);
+      }
+    }
+
+    // 글자 수 조정 (30~40글자)
+    reviews = reviews.map(review => {
+      const length = review.length;
+      if (length < 30) {
+        return review + ' 다음에도 올게요.';
+      } else if (length > 40) {
+        return review.substring(0, 37) + '...';
+      }
+      return review;
+    });
+
+    return res.status(200).json({ reviews });
+  } catch (error) {
+    console.error('API error:', error);
+    return res.status(500).json({ 
+      error: '리뷰 생성에 실패했습니다.',
+      message: error.message 
+    });
+  }
+}
+
+// ========== Google Gemini API ==========
+async function generateWithGemini(menuText, sideText, keywordsText, storeName, targetLength, apiKey) {
+  const prompt = `네이버 플레이스 영수증 리뷰를 작성해주세요.
+
+요구사항:
+- 매장명: ${storeName}
+- 주문한 메뉴: ${menuText}
+${sideText ? `- 함께 먹은 것: ${sideText}` : ''}
+- 반드시 포함할 키워드: ${keywordsText}
+- 글자 수: ${targetLength || 35}글자 내외 (30~40글자)
+- 자연스럽고 진짜 손님이 쓴 것 같은 말투로 작성
+- 키워드는 문장 속에 자연스럽게 1회씩만 포함
+- 키워드를 나열하지 말고 문장으로 자연스럽게 표현
+- 3개의 서로 다른 스타일의 리뷰를 작성 (말투, 감정 강도, 문장 구조가 다르게)
+
+응답 형식: JSON 배열로 3개의 리뷰만 반환
+예시: ["리뷰1", "리뷰2", "리뷰3"]
+다른 설명 없이 JSON 배열만 반환해주세요.`;
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Gemini API error: ${errorData}`);
+    }
+
+    const data = await response.json();
+    const responseText = data.candidates[0].content.parts[0].text.trim();
+
+    // JSON 배열 추출
+    let reviews = [];
+    try {
+      // JSON 배열 찾기
+      const jsonMatch = responseText.match(/\[(.*?)\]/s);
+      if (jsonMatch) {
+        reviews = JSON.parse(jsonMatch[0]);
+      } else {
+        // 직접 파싱 시도
+        reviews = JSON.parse(responseText);
+        if (!Array.isArray(reviews)) {
+          reviews = Object.values(reviews).filter(v => typeof v === 'string');
+        }
+      }
+    } catch (parseError) {
+      // 줄바꿈으로 분리 시도
+      reviews = responseText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0 && !line.startsWith('[') && !line.startsWith(']'))
+        .map(line => line.replace(/^["']|["']$/g, '').replace(/^-\s*/, ''))
+        .filter(line => line.length > 10)
+        .slice(0, 3);
+    }
+
+    return reviews.slice(0, 3);
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    throw error;
+  }
+}
+
+// ========== Hugging Face Inference API ==========
+async function generateWithHuggingFace(menuText, sideText, keywordsText, storeName, targetLength, apiKey) {
+  const prompt = `네이버 플레이스 영수증 리뷰를 작성해주세요.
+
+매장명: ${storeName}
+주문한 메뉴: ${menuText}
+${sideText ? `함께 먹은 것: ${sideText}` : ''}
+포함할 키워드: ${keywordsText}
+글자 수: ${targetLength || 35}글자 내외
+
+자연스럽고 진짜 손님이 쓴 것 같은 말투로 3개의 서로 다른 리뷰를 작성해주세요.`;
+
+  try {
+    // 한국어 모델 사용 (예: beomi/KoAlpaca-Polyglot-5.8B)
+    const response = await fetch(
+      'https://api-inference.huggingface.co/models/beomi/KoAlpaca-Polyglot-5.8B',
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        method: 'POST',
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 200,
+            temperature: 0.8,
+            return_full_text: false
+          }
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Hugging Face API error: ${errorData}`);
+    }
+
+    const data = await response.json();
+    const generatedText = data[0]?.generated_text || '';
+
+    // 생성된 텍스트에서 리뷰 추출
+    const reviews = generatedText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 10 && line.length < 50)
+      .slice(0, 3);
+
+    return reviews.length >= 3 ? reviews : [
+      `${menuText} 먹었는데 맛있었어요.`,
+      `${menuText} 주문했어요. 좋았습니다.`,
+      `${menuText} 시켰는데 괜찮았어요.`
+    ];
+  } catch (error) {
+    console.error('Hugging Face API error:', error);
+    throw error;
+  }
+}

@@ -196,7 +196,7 @@ function generateFallbackReviews(menuText, sideText, keywordsBundle) {
 
   return templates.map(template => {
     let review = template();
-    // 35글자 내외로 조정
+    // 200~400글자 내외로 조정
     if (review.length < 30) {
       review = review + ' 다음에도 올게요.';
     } else if (review.length > 40) {
@@ -214,7 +214,7 @@ async function generateWithHuggingFace(menuText, sideText, keywordsText, storeNa
 주문한 메뉴: ${menuText}
 ${sideText ? `함께 먹은 것: ${sideText}` : ''}
 포함할 키워드: ${keywordsText}
-글자 수: ${targetLength || 35}글자 내외
+글자 수: ${targetLength || 300}글자 내외 (200~400글자)
 
 자연스럽고 진짜 손님이 쓴 것 같은 말투로 3개의 서로 다른 리뷰를 작성해주세요.`;
 
@@ -251,7 +251,7 @@ ${sideText ? `함께 먹은 것: ${sideText}` : ''}
     const reviews = generatedText
       .split('\n')
       .map(line => line.trim())
-      .filter(line => line.length > 10 && line.length < 50)
+      .filter(line => line.length > 200 && line.length < 400)
       .slice(0, 3);
 
     return reviews.length >= 3 ? reviews : [

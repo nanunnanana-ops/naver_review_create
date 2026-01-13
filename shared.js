@@ -12,7 +12,7 @@
 const ADMIN_PIN = '2222';
 const CONFIG_SOURCE = 'local'; // 'local' 또는 'remote'
 const REMOTE_CONFIG_URL = './config.json'; // remote 모드일 때 사용
-const DEMO_MODE = false; // false면 AI API 사용 (Gemini/Hugging Face), true면 템플릿 기반
+const DEMO_MODE = true; // false면 AI API 사용 (Gemini/Hugging Face), true면 템플릿 기반 (로컬 테스트용)
 
 // ========== 기본 설정 ==========
 const DEFAULT_CONFIG = {

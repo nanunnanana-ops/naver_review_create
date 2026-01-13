@@ -117,7 +117,7 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ''}
 다른 설명 없이 JSON 배열만 반환해주세요.`;
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

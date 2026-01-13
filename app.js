@@ -146,7 +146,7 @@ async function handleGenerate() {
           menus: selectedMenus,
           sides: selectedSides,
           keywordsBundle: keywordsBundle,
-          targetLength: 35, // 35글자 내외
+          targetLength: 300, // 200~400글자 내외
           nonce: nonce
         })
       });
@@ -177,7 +177,7 @@ async function handleGenerate() {
             menus: selectedMenus,
             sides: selectedSides,
             keywordsBundle: keywordsBundle,
-            targetLength: 35,
+            targetLength: 300,
             nonce: nonce + '_retry' + attempts
           })
         });

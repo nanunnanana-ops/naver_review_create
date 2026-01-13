@@ -63,13 +63,22 @@ export default async function handler(req, res) {
       }
     }
 
-    // 글자 수 조정 (30~40글자)
+    // 글자 수 조정 (200~400글자)
     reviews = reviews.map(review => {
       const length = review.length;
-      if (length < 30) {
-        return review + ' 다음에도 올게요.';
-      } else if (length > 40) {
-        return review.substring(0, 37) + '...';
+      if (length < 200) {
+        // 짧으면 내용 추가
+        const additions = [
+          ' 다음에도 방문할 예정입니다.',
+          ' 가격 대비 만족스러웠어요.',
+          ' 친구들에게도 추천하고 싶습니다.',
+          ' 분위기도 좋고 맛도 좋았습니다.'
+        ];
+        const addition = additions[Math.floor(Math.random() * additions.length)];
+        return review + addition;
+      } else if (length > 400) {
+        // 길면 자르기
+        return review.substring(0, 397) + '...';
       }
       return review;
     });
@@ -93,7 +102,7 @@ async function generateWithGemini(menuText, sideText, keywordsText, storeName, t
 - 주문한 메뉴: ${menuText}
 ${sideText ? `- 함께 먹은 것: ${sideText}` : ''}
 - 반드시 포함할 키워드: ${keywordsText}
-- 글자 수: ${targetLength || 35}글자 내외 (30~40글자)
+- 글자 수: ${targetLength || 300}글자 내외 (200~400글자)
 - 자연스럽고 진짜 손님이 쓴 것 같은 말투로 작성
 - 키워드는 문장 속에 자연스럽게 1회씩만 포함
 - 키워드를 나열하지 말고 문장으로 자연스럽게 표현

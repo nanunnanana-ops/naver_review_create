@@ -8,6 +8,11 @@ let config = null;
 // ========== 초기화 ==========
 async function init() {
   config = await loadConfig();
+  
+  // 디버깅: 로드된 설정 확인
+  console.log('로드된 설정:', config);
+  console.log('필수 키워드:', config.requiredKeywords);
+  
   applyConfig();
   setupEventListeners();
 }

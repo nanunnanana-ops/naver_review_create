@@ -106,11 +106,25 @@ function handleSaveLocal() {
   if (!pinVerified) return;
 
   const newConfig = collectConfigFromForm();
+  
+  // 디버깅: 저장하려는 설정 확인
+  console.log('저장할 설정:', newConfig);
+  console.log('필수 키워드:', newConfig.requiredKeywords);
+  
   const success = saveConfig(newConfig);
 
   if (success) {
     config = newConfig;
-    showToast('설정이 저장되었습니다.');
+    
+    // localStorage에 실제로 저장되었는지 확인
+    const saved = localStorage.getItem('reviewGeneratorConfig');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      console.log('저장된 설정:', parsed);
+      console.log('저장된 필수 키워드:', parsed.requiredKeywords);
+    }
+    
+    showToast('설정이 저장되었습니다. 메인 페이지를 새로고침해주세요.');
   } else {
     showToast('저장에 실패했습니다. (remote 모드에서는 다운로드를 사용하세요)');
   }

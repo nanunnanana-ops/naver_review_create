@@ -55,6 +55,7 @@ async function loadConfig() {
 function loadConfigFromLocal() {
   try {
     const saved = localStorage.getItem('reviewGeneratorConfig');
+    console.log('=== loadConfigFromLocal 호출 ===');
     console.log('localStorage에서 읽은 원본 데이터:', saved);
     
     if (saved) {
@@ -63,34 +64,44 @@ function loadConfigFromLocal() {
       console.log('파싱된 필수 키워드:', parsed.requiredKeywords);
       console.log('파싱된 필수 키워드 타입:', typeof parsed.requiredKeywords, Array.isArray(parsed.requiredKeywords));
       
-      // parsed 값이 있으면 그대로 사용 (저장된 값이 우선)
-      // 배열 필드는 명시적으로 처리 (배열이 아니거나 빈 배열이면 기본값 사용)
+      // 저장된 값이 우선하도록 단순화: 배열 필드는 parsed에서 가져오고, 유효하지 않으면 기본값 사용
       const merged = {
-        ...DEFAULT_CONFIG,
-        ...parsed,
-        // 배열 필드는 명시적으로 저장된 값 사용 (배열이 아니거나 길이가 0이면 기본값)
+        ...DEFAULT_CONFIG, // 기본값 먼저 설정
+        ...parsed, // 저장된 값으로 덮어쓰기
+        // 배열 필드는 명시적으로 검증 후 사용 (배열이 아니거나 길이가 0이면 기본값 유지)
         requiredKeywords: (Array.isArray(parsed.requiredKeywords) && parsed.requiredKeywords.length > 0)
           ? parsed.requiredKeywords
-          : DEFAULT_CONFIG.requiredKeywords,
+          : (parsed.requiredKeywords !== undefined ? parsed.requiredKeywords : DEFAULT_CONFIG.requiredKeywords),
         promoKeywordsPool: (Array.isArray(parsed.promoKeywordsPool) && parsed.promoKeywordsPool.length > 0)
           ? parsed.promoKeywordsPool
-          : DEFAULT_CONFIG.promoKeywordsPool,
+          : (parsed.promoKeywordsPool !== undefined ? parsed.promoKeywordsPool : DEFAULT_CONFIG.promoKeywordsPool),
         menus: (Array.isArray(parsed.menus) && parsed.menus.length > 0)
           ? parsed.menus
-          : DEFAULT_CONFIG.menus,
+          : (parsed.menus !== undefined ? parsed.menus : DEFAULT_CONFIG.menus),
         sides: (Array.isArray(parsed.sides) && parsed.sides.length > 0)
           ? parsed.sides
-          : DEFAULT_CONFIG.sides,
+          : (parsed.sides !== undefined ? parsed.sides : DEFAULT_CONFIG.sides),
       };
       
+      // 디버깅: 최종 병합 결과 확인
+      console.log('=== 병합 결과 ===');
       console.log('병합된 설정:', merged);
       console.log('병합된 필수 키워드:', merged.requiredKeywords);
+      console.log('병합된 필수 키워드 타입:', typeof merged.requiredKeywords, Array.isArray(merged.requiredKeywords));
       console.log('병합된 필수 키워드 개수:', merged.requiredKeywords ? merged.requiredKeywords.length : 0);
+      console.log('병합된 필수 키워드 내용:', JSON.stringify(merged.requiredKeywords));
+      
+      // 검증: merged.requiredKeywords가 배열이 아니면 경고
+      if (!Array.isArray(merged.requiredKeywords)) {
+        console.error('경고: 병합된 requiredKeywords가 배열이 아님!', merged.requiredKeywords);
+        merged.requiredKeywords = DEFAULT_CONFIG.requiredKeywords;
+      }
       
       return merged;
     }
   } catch (error) {
     console.error('Local config load failed:', error);
+    console.error('에러 스택:', error.stack);
   }
   
   console.log('기본 설정 사용:', DEFAULT_CONFIG);

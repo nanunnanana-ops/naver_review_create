@@ -156,12 +156,7 @@ async function handleGenerate() {
         attempts++;
       }
     } else {
-    // 서버 모드: API 호출
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      // 서버 모드: API 호출
       const requestBody = {
         storeName: config.storeName,
         menus: selectedMenus,

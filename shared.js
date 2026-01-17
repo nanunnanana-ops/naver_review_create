@@ -22,19 +22,14 @@ const DEMO_MODE = false; // false면 AI API 사용 (Gemini/Hugging Face), true�
 // ========== 기본 설정 ==========
 const DEFAULT_CONFIG = {
   storeName: "어국수",
-  requiredKeywords: ["어국수", "국물"],
-  promoKeywordsPool: ["시원", "깔끔", "매콤", "어묵국수"],
-  menus: ["어묵국수", "얼큰바지락국수", "소갈비국수", "잔치국수"],
-  sides: ["소주", "맥주", "김치전", "부추전", "없음"],
-  lengthOptions: {
-    short: 2,
-    normal: 3,
-    long: 4
-  },
+  requiredKeywords: ["서대문역", "국물", "강북삼성병원", "영천시장"],
+  promoKeywordsPool: ["시원", "깔끔", "매콤", "국수"],
+  menus: ["어묵국수", "얼큰어묵국수", "잔치국수", "소갈비국수", "얼큰소갈비국수", "얼큰바지락국수", "비빔국수", "김치말이국수", "매콤닭발", "매콤제육", "매콤쭈꾸미", "두부김치", "스팸구이계란", "해물김치전", "해물부추전"],
+  sides: ["소주", "맥주", "막걸리", "없음"],
   ui: {
     themeBg: "#FDFBF8",
     accent: "#C0362C",
-    subtitle: "복사해서 네이버 영수증 리뷰에 붙여넣기만 하세요"
+    subtitle: "메뉴선택 후 리뷰생성버튼 누르시고 마음에 드는 생성된 리뷰 밑에 [복사]버튼 누르시면 네이버로 이동합니다"
   }
 };
 

@@ -136,26 +136,50 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
 
     if (missing.length === 0) return updated;
 
-    // 누락 키워드를 문장으로 추가 (길이 초과 방지)
-    const appendSentences = missing
-      .map((kw) => ` ${String(kw).trim()} 관련해서도 만족했어요.`)
-      .join("");
-
-    // 400자를 넘지 않도록 본문을 줄이고 추가 문장을 붙임
+    // 누락 키워드를 자연스러운 문장으로 분산 삽입
+    const sentences = updated.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean);
+    const insertions = missing.map((kw) => buildNaturalKeywordSentence(String(kw).trim()));
     const maxLength = 400;
-    const allowedBaseLength = Math.max(0, maxLength - appendSentences.length);
-    if (updated.length > allowedBaseLength) {
-      updated = updated.substring(0, allowedBaseLength).trim();
-    }
-    updated = `${updated}${appendSentences}`;
 
-    // 여전히 길면 마지막 정리
+    insertions.forEach((sentence, idx) => {
+      const targetIndex = Math.min(
+        sentences.length,
+        Math.max(0, Math.floor((idx + 1) * (sentences.length / (insertions.length + 1))))
+      );
+      sentences.splice(targetIndex, 0, sentence);
+    });
+
+    updated = sentences.join(" ").replace(/\s+/g, " ").trim();
     if (updated.length > maxLength) {
-      updated = updated.substring(0, maxLength);
+      updated = updated.substring(0, maxLength).trim();
     }
 
     return updated;
   });
+}
+
+function buildNaturalKeywordSentence(keyword) {
+  if (!keyword) return "";
+
+  const locationHints = ["역", "병원", "시장", "터미널", "공원", "학교", "사거리", "거리", "동", "구", "로", "길"];
+  const isLocation = locationHints.some((hint) => keyword.includes(hint));
+
+  if (isLocation) {
+    const templates = [
+      `${keyword} 근처라 들르기 편했어요.`,
+      `${keyword} 인근에 있어서 찾기 쉬웠어요.`,
+      `${keyword} 쪽이라 접근성이 좋았어요.`,
+      `${keyword} 주변이라 이동이 수월했어요.`,
+    ];
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  const templates = [
+    `${keyword} 부분도 만족스러웠어요.`,
+    `${keyword} 느낌이 좋았습니다.`,
+    `${keyword}이(가) 자연스럽게 느껴졌어요.`,
+  ];
+  return templates[Math.floor(Math.random() * templates.length)];
 }
 
 // ========== 키워드를 자연어 phrase로 변환 ==========
@@ -244,6 +268,8 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
 - 비문 금지: "국물했어요", "어국수했어요" 같은 패턴 절대 사용 금지
 - 반복 금지: "다음에도 방문할 예정입니다", "가격 대비 만족스러웠어요" 같은 문구 사용 금지
 - 3개 리뷰는 서로 다른 톤 (담백/감정/디테일)
+- 지역/장소 키워드(예: 역/병원/시장)는 "근처/인근/쪽" 표현으로 자연스럽게 문장 속에 섞기
+- 키워드는 한 문장에 몰아넣지 말고 서로 다른 문장에 분산
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)

@@ -114,25 +114,48 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
   const maxRetries = 3; // 비문 재생성 포함해서 3회
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // 반복 금지 문구 리스트
+    const forbiddenPhrases = [
+      "다음에도 방문할 예정입니다",
+      "가격 대비 만족스러웠어요",
+      "친구들에게도 추천하고 싶습니다",
+      "자주 찾을 수 있을 것 같습니다",
+      "또 올게요",
+      "재방문",
+      "가격 대비"
+    ];
+    
     const prompt = `네이버 영수증 리뷰 3개를 작성해줘.
 
-조건:
+[필수 조건]
 - 매장명: ${storeName}
 - 주문: ${menuText}
 ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
-${keywordsList.length > 0 ? `- 포함 키워드(각 리뷰에 자연스럽게 1회만): ${keywordsText}` : ""}
-- 각 리뷰는 230~320자
-- 말투는 실제 방문자가 쓴 자연스러운 한국어(과장 X)
-- 같은 문장/표현 반복 금지
-${attempt > 0 ? "- 특히 \"친절\", \"추천\", \"가격 대비\", \"재방문\", \"또 올게요\" 같은 상투어 반복 금지" : ""}
-- 비문 금지: "국물했어요", "어국수했어요" 같은 "명사+했어요" 패턴 절대 금지
-- 키워드는 조사/어미를 붙여서 자연스럽게만 사용 (예: "국물이 진했어요", "어국수에서 먹었어요")
-${attempt > 1 ? "- 반드시 조사/어미를 붙여서 자연스럽게 표현하세요. "X했어요" 같은 비문 패턴을 절대 사용하지 마세요." : ""}
-- 3개는 서로 톤이 달라야 함:
-  1) 담백/정보형  2) 감정 조금 있는 후기형  3) 디테일 묘사형
+${keywordsList.length > 0 ? `- 키워드 활용 예시 (이런 식으로 자연스럽게 사용): ${keywordsText}` : ""}
+
+[작성 규칙 - 절대 위반 금지]
+1. 길이: 각 리뷰 230~320자
+2. 비문 절대 금지:
+   ❌ "국물했어요", "어국수했어요", "어국수하고 국물했어요" 같은 패턴
+   ✅ "국물이 진했어요", "어국수에서 먹었어요", "어국수 맛이 좋았어요"
+   - 명사 뒤에는 반드시 조사(이/가/을/를/에서/의 등)를 붙이고, 동사/형용사로 연결
+   - "X하고 Y했어요" 같은 비문 절대 금지
+
+3. 반복 금지 (같은 문장/표현을 리뷰 내에서 또는 3개 리뷰 간에 반복 불가):
+${forbiddenPhrases.map(p => `   - "${p}"`).join('\n')}
+   - 위 문구들은 절대 사용하지 마세요
+
+4. 각 리뷰마다 다른 톤:
+   1) 담백/정보형: 사실만 간단히 서술
+   2) 감정 후기형: 약간의 감정 표현 포함
+   3) 디테일 묘사형: 구체적인 묘사와 경험
+
+5. 키워드는 각 리뷰에 자연스럽게 1회씩만 포함
+
+${attempt > 0 ? `[중요] 이전 결과에서 비문이나 반복이 발견되었습니다. 위 규칙을 더욱 엄격히 준수하세요.` : ""}
 
 출력 형식:
-반드시 JSON 배열만 출력
+JSON 배열만 출력 (설명 없이)
 ["리뷰1","리뷰2","리뷰3"]`;
 
     try {
@@ -293,16 +316,26 @@ function checkGrammaticalErrors(reviews) {
   const errors = [];
   let hasError = false;
 
-  // 비문 패턴: "명사+했어요", "명사+했음", "명사+했던" 등
+  // 비문 패턴: "명사+했어요", "명사하고 명사+했어요" 등
   // 허용: "시원했어요", "깔끔했어요" (형용사)
-  // 금지: "국물했어요", "어국수했어요" (명사)
+  // 금지: "국물했어요", "어국수했어요", "어국수하고 국물했어요" (명사)
   const forbiddenPatterns = [
-    /(국물|어국수|어묵국수|국수|국)(했어요|했음|했던|했고|했는데)/g,
-    // 일반적인 명사+했어요 패턴 (너무 포괄적이므로 주석 처리)
-    // /([가-힣]+국물|[가-힣]+국수|[가-힣]+어국수)(했어요|했음)/g,
+    /(국물|어국수|어묵국수|국수|국|맛)(했어요|했음|했던|했고|했는데|하고\s+[가-힣]+했어요)/g,
+    // "X하고 Y했어요" 패턴 체크
+    /([가-힣]+(국물|어국수|어묵|국수))하고\s+([가-힣]+)(했어요|했음)/g,
+  ];
+
+  // 반복 문구 체크
+  const forbiddenPhrases = [
+    "다음에도 방문할 예정입니다",
+    "가격 대비 만족스러웠어요",
+    "친구들에게도 추천하고 싶습니다",
+    "자주 찾을 수 있을 것 같습니다",
+    "또 올게요",
   ];
 
   reviews.forEach((review, index) => {
+    // 비문 패턴 체크
     forbiddenPatterns.forEach((pattern) => {
       const matches = review.match(pattern);
       if (matches) {
@@ -310,6 +343,25 @@ function checkGrammaticalErrors(reviews) {
           errors.push(`리뷰 ${index + 1}에 비문 패턴 발견: "${match}"`);
           hasError = true;
         });
+      }
+    });
+
+    // 반복 문구 체크 (같은 리뷰 내에서 2회 이상 사용)
+    forbiddenPhrases.forEach((phrase) => {
+      const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      const matches = review.match(regex);
+      if (matches && matches.length > 1) {
+        errors.push(`리뷰 ${index + 1}에 "${phrase}" 반복 사용 (${matches.length}회)`);
+        hasError = true;
+      }
+    });
+
+    // 3개 리뷰 간 동일 문구 반복 체크 (2개 이상 리뷰에서 동일 문구 사용)
+    forbiddenPhrases.forEach((phrase) => {
+      const count = reviews.filter(r => r.includes(phrase)).length;
+      if (count >= 2 && review.includes(phrase)) {
+        errors.push(`리뷰 ${index + 1}에 "${phrase}" 사용 (전체 ${count}개 리뷰에서 반복)`);
+        hasError = true;
       }
     });
   });

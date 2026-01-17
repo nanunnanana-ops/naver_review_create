@@ -46,14 +46,14 @@ export default async function handler(req, res) {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn("API 키가 없어 템플릿 기반 생성 사용");
       console.warn("GROQ_API_KEY:", groqKey ? "있음 (마스킹됨)" : "없음");
-      reviews = generateFallbackReviews(menuText, sideText, keywordsBundle || []);
+      reviews = generateFallbackReviews(menuText, sideText, keywordsBundle || [], storeName);
     }
 
     // 최소 3개 리뷰 보장 (API 호출 실패 시에만)
     if (reviews.length < 3) {
       console.warn("리뷰가 3개 미만, 기본 템플릿 사용");
       const kb = keywordsBundle || [];
-      reviews = generateFallbackReviews(menuText, sideText, kb);
+      reviews = generateFallbackReviews(menuText, sideText, kb, storeName);
     }
 
     // 길이 검증만 수행 (후처리로 늘리지 않음)
@@ -253,7 +253,7 @@ JSON 배열만 출력 (설명 없이)
   // 검증 실패하거나 null이면 최소한의 리뷰 반환
   if (!reviews || reviews.length < 3) {
     console.warn("검증 실패 또는 리뷰 부족, 기본 리뷰 반환");
-    return generateFallbackReviews(menuText, sideText, keywordsList);
+    return generateFallbackReviews(menuText, sideText, keywordsList, storeName);
   }
 
   return reviews;
@@ -373,17 +373,31 @@ function checkGrammaticalErrors(reviews) {
 }
 
 // ========== 템플릿 기반 폴백 ==========
-function generateFallbackReviews(menuText, sideText, keywordsBundle) {
-  const k1 = keywordsBundle[0] || "";
-  const k2 = keywordsBundle[1] || "";
-  const k3 = keywordsBundle[2] || "";
+// 템플릿 생성 로직은 templates.js에서 가져옴
+const { generateReviews: generateTemplateReviews } = require("./templates.js");
 
-  // 간단한 템플릿 (후처리로 늘리지 않음)
-  const reviews = [
-    `${menuText}${k1 ? ` ${k1}` : ""} 먹었어요.${sideText ? ` ${sideText}도 주문했는데 괜찮았습니다.` : ""} ${menuText}의 맛이 제대로 느껴졌어요.`,
-    `${menuText} 주문했습니다.${k2 ? ` ${k2}했고` : ""} 포장 상태도 좋았어요.${sideText ? ` ${sideText}도 함께 시켰는데` : ""} 괜찮았습니다.`,
-    `${menuText} 시켰어요.${k3 ? ` ${k3}` : ""} 했고 양도 충분했습니다.${sideText ? ` ${sideText}도` : ""} 같이 먹으니 좋았어요.`,
-  ];
-
-  return reviews;
+function generateFallbackReviews(menuText, sideText, keywordsBundle, storeName = "어국수") {
+  // 템플릿 기반 생성 사용
+  // menuText는 문자열이거나 배열일 수 있으므로 배열로 변환
+  const menus = typeof menuText === "string" ? menuText.split("과 ").filter(Boolean) : [menuText];
+  const sides = sideText ? sideText.split(", ").filter(Boolean) : [];
+  
+  try {
+    return generateTemplateReviews({
+      storeName: storeName || "어국수",
+      menus: menus,
+      sides: sides,
+      keywordsBundle: keywordsBundle || [],
+      targetLength: 300,
+    });
+  } catch (error) {
+    console.error("Template generation error:", error);
+    // 템플릿 생성 실패 시 간단한 폴백
+    const k1 = keywordsBundle?.[0] || "";
+    return [
+      `${menuText}${k1 ? ` ${k1}` : ""} 먹었어요.${sideText ? ` ${sideText}도 주문했는데 괜찮았습니다.` : ""} 맛이 제대로 느껴졌어요.`,
+      `${menuText} 주문했습니다. 포장 상태도 좋았어요.${sideText ? ` ${sideText}도 함께 시켰는데` : ""} 괜찮았습니다.`,
+      `${menuText} 시켰어요. 양도 충분했습니다.${sideText ? ` ${sideText}도` : ""} 같이 먹으니 좋았어요.`,
+    ];
+  }
 }

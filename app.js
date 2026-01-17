@@ -178,7 +178,6 @@ async function handleGenerate() {
         },
         body: JSON.stringify(requestBody)
       });
-    });
 
       if (!response.ok) {
         const errorText = await response.text();

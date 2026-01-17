@@ -115,22 +115,38 @@ function saveConfig(config) {
     return false;
   } else {
     try {
-      console.log('saveConfig 호출됨 - 저장할 설정:', config);
+      console.log('=== saveConfig 호출 ===');
+      console.log('저장할 설정:', config);
       console.log('저장할 필수 키워드:', config.requiredKeywords);
       console.log('저장할 필수 키워드 타입:', typeof config.requiredKeywords, Array.isArray(config.requiredKeywords));
+      
+      // 검증: requiredKeywords가 배열이 아니면 경고 및 수정
+      if (!Array.isArray(config.requiredKeywords)) {
+        console.error('경고: 저장하려는 requiredKeywords가 배열이 아님!', config.requiredKeywords);
+        config.requiredKeywords = Array.isArray(config.requiredKeywords) ? config.requiredKeywords : (config.requiredKeywords ? [config.requiredKeywords] : DEFAULT_CONFIG.requiredKeywords);
+      }
       
       const jsonString = JSON.stringify(config);
       console.log('JSON 문자열로 변환:', jsonString);
       console.log('JSON 문자열 길이:', jsonString.length);
+      console.log('JSON에 requiredKeywords 포함 여부:', jsonString.includes('requiredKeywords'));
       
       localStorage.setItem('reviewGeneratorConfig', jsonString);
       
       // 저장 후 즉시 확인
       const verify = localStorage.getItem('reviewGeneratorConfig');
       const verifyParsed = JSON.parse(verify);
-      console.log('저장 후 확인 - 읽은 값:', verifyParsed);
-      console.log('저장 후 확인 - 필수 키워드:', verifyParsed.requiredKeywords);
-      console.log('저장 후 확인 - 필수 키워드 개수:', verifyParsed.requiredKeywords ? verifyParsed.requiredKeywords.length : 0);
+      console.log('=== 저장 후 확인 ===');
+      console.log('읽은 값:', verifyParsed);
+      console.log('필수 키워드:', verifyParsed.requiredKeywords);
+      console.log('필수 키워드 타입:', typeof verifyParsed.requiredKeywords, Array.isArray(verifyParsed.requiredKeywords));
+      console.log('필수 키워드 개수:', verifyParsed.requiredKeywords ? verifyParsed.requiredKeywords.length : 0);
+      console.log('필수 키워드 내용:', JSON.stringify(verifyParsed.requiredKeywords));
+      
+      // 검증: 읽은 값의 requiredKeywords가 배열이 아니면 경고
+      if (!Array.isArray(verifyParsed.requiredKeywords)) {
+        console.error('경고: localStorage에 저장된 requiredKeywords가 배열이 아님!', verifyParsed.requiredKeywords);
+      }
       
       return true;
     } catch (error) {

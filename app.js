@@ -3,7 +3,9 @@
  * 리뷰 생성 및 UI 인터랙션 처리
  */
 
-console.log('app.js 로드됨');
+console.log('🔴🔴🔴 app.js 로드됨 - 타임스탬프:', new Date().toISOString());
+console.warn('⚠️ WARNING: app.js loaded');
+console.error('❌ ERROR TEST: app.js loaded');
 
 let config = null;
 

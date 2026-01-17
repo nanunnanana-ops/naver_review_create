@@ -9,7 +9,9 @@
  */
 
 // 즉시 실행: shared.js가 로드되었는지 확인
-console.log('🔵 shared.js 파일 로드됨 - 타임스탬프:', new Date().toISOString());
+console.log('🔵🔵🔵 shared.js 파일 로드됨 - 타임스탬프:', new Date().toISOString());
+console.warn('⚠️ WARNING: shared.js loaded');
+console.error('❌ ERROR TEST: shared.js loaded');
 
 // ========== 커스텀 설정 ==========
 const ADMIN_PIN = '2222';

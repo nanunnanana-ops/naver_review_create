@@ -3,9 +3,7 @@
  * 리뷰 생성 및 UI 인터랙션 처리
  */
 
-console.log('🔴🔴🔴 app.js 로드됨 - 타임스탬프:', new Date().toISOString());
-console.warn('⚠️ WARNING: app.js loaded');
-console.error('❌ ERROR TEST: app.js loaded');
+// app.js 로드됨
 
 let config = null;
 
@@ -14,11 +12,6 @@ async function init() {
   console.log('init() 함수 호출됨');
   
   config = await loadConfig();
-  
-  // 디버깅: 로드된 설정 확인
-  console.log('로드된 설정:', config);
-  console.log('필수 키워드:', config.requiredKeywords);
-  console.log('필수 키워드 개수:', config.requiredKeywords ? config.requiredKeywords.length : 0);
   
   applyConfig();
   setupEventListeners();
@@ -106,17 +99,10 @@ async function handleGenerate() {
     .filter(v => v !== '없음');
 
   // 키워드 번들 생성
-  console.log('=== 리뷰 생성 시작 ===');
-  console.log('config.requiredKeywords:', config.requiredKeywords);
-  console.log('config.requiredKeywords 타입:', typeof config.requiredKeywords, Array.isArray(config.requiredKeywords));
-  console.log('config.requiredKeywords 개수:', config.requiredKeywords ? config.requiredKeywords.length : 0);
-  
   const keywordsBundle = [
     ...(config.requiredKeywords || []),
     ...selectedMenus
   ];
-  
-  console.log('keywordsBundle 생성:', keywordsBundle);
 
   // 프로모션 키워드 풀에서 랜덤 2~4개 선택
   const promoCount = Math.floor(Math.random() * 3) + 2; // 2~4개
@@ -166,10 +152,6 @@ async function handleGenerate() {
         targetLength: 300, // 200~400글자 내외
         nonce: nonce
       };
-      
-      console.log('API 요청 데이터:', requestBody);
-      console.log('전송할 requiredKeywords:', requestBody.requiredKeywords);
-      console.log('전송할 requiredKeywords 개수:', requestBody.requiredKeywords ? requestBody.requiredKeywords.length : 0);
       
       const response = await fetch('/api/generate', {
         method: 'POST',

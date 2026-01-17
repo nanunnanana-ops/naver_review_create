@@ -8,11 +8,6 @@
  * - DEMO_MODE: true면 서버 없이 로컬에서 리뷰 생성
  */
 
-// 즉시 실행: shared.js가 로드되었는지 확인
-console.log('🔵🔵🔵 shared.js 파일 로드됨 - 타임스탬프:', new Date().toISOString());
-console.warn('⚠️ WARNING: shared.js loaded');
-console.error('❌ ERROR TEST: shared.js loaded');
-
 // ========== 커스텀 설정 ==========
 const ADMIN_PIN = '2222';
 const CONFIG_SOURCE = 'local'; // 'local' 또는 'remote'
@@ -36,7 +31,6 @@ const DEFAULT_CONFIG = {
 // ========== 설정 로드 ==========
 async function loadConfig() {
   // 하드코딩된 DEFAULT_CONFIG를 항상 사용 (localStorage 무시)
-  console.log('✅ 하드코딩된 DEFAULT_CONFIG 사용:', DEFAULT_CONFIG);
   return DEFAULT_CONFIG;
   
   // 아래 코드는 사용하지 않음 (주석 처리)

@@ -22,13 +22,6 @@ export default async function handler(req, res) {
   try {
     const { storeName, menus, sides, keywordsBundle, requiredKeywords, targetLength, nonce } = req.body;
 
-    // 디버깅: 받은 데이터 확인
-    console.log('=== API 요청 받음 ===');
-    console.log('requiredKeywords (원본):', requiredKeywords);
-    console.log('requiredKeywords 타입:', typeof requiredKeywords, Array.isArray(requiredKeywords));
-    console.log('requiredKeywords 개수:', requiredKeywords ? requiredKeywords.length : 0);
-    console.log('keywordsBundle:', keywordsBundle);
-
     if (!menus || menus.length === 0) {
       return res.status(400).json({ error: "메뉴가 필요합니다" });
     }
@@ -48,15 +41,11 @@ export default async function handler(req, res) {
     
     // 필수 키워드를 phrase로 변환 (프롬프트에 명확히 표시)
     const requiredKeywordsArray = Array.isArray(requiredKeywords) ? requiredKeywords : (requiredKeywords ? [requiredKeywords] : []);
-    console.log('필수 키워드 배열 (확인):', requiredKeywordsArray);
     
     const requiredKeywordsPhrases = requiredKeywordsArray.length > 0
       ? convertKeywordsToPhrases(requiredKeywordsArray)
       : [];
     const requiredKeywordsText = requiredKeywordsPhrases.join(", ");
-    
-    console.log('필수 키워드 phrase 변환 결과:', requiredKeywordsPhrases);
-    console.log('필수 키워드 phrase 텍스트:', requiredKeywordsText);
     
     // 원본 키워드 목록 (검증용 - phrase 변환 전)
     const originalKeywords = keywordsBundle || [];
@@ -87,6 +76,11 @@ export default async function handler(req, res) {
       reviews = generateFallbackReviews(menuText, sideText, kb, storeName);
     }
 
+    // 필수 키워드가 누락된 경우 보정 (최소한의 문장 추가)
+    if (requiredKeywordsArray.length > 0) {
+      reviews = ensureRequiredKeywords(reviews, requiredKeywordsArray);
+    }
+
     // 길이 검증만 수행 (후처리로 늘리지 않음)
     reviews = reviews.map((review, index) => {
       const length = review.length;
@@ -109,6 +103,36 @@ export default async function handler(req, res) {
       details: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
+}
+
+// ========== 필수 키워드 보정 ==========
+function ensureRequiredKeywords(reviews, requiredKeywords) {
+  return reviews.map((review) => {
+    let updated = review;
+    const missing = requiredKeywords.filter((kw) => {
+      const keywordTrimmed = String(kw).trim();
+      if (!keywordTrimmed) return false;
+      const regex = new RegExp(keywordTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+      return !regex.test(updated);
+    });
+
+    if (missing.length === 0) return updated;
+
+    // 최소 문장으로 보정
+    missing.forEach((kw) => {
+      const keyword = String(kw).trim();
+      if (!keyword) return;
+      const sentence = ` ${keyword} 관련해서도 만족했어요.`;
+      updated += sentence;
+    });
+
+    // 400자 초과 시 자르기
+    if (updated.length > 400) {
+      updated = updated.substring(0, 397) + "...";
+    }
+
+    return updated;
+  });
 }
 
 // ========== 키워드를 자연어 phrase로 변환 ==========
@@ -348,8 +372,6 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
     if (requiredKeywords && requiredKeywords.length > 0) {
       const missingRequired = [];
       
-      console.log(`[검증] 리뷰 ${index + 1} 필수 키워드 체크 시작`);
-      console.log(`[검증] 체크할 필수 키워드:`, requiredKeywords);
       
       requiredKeywords.forEach((keyword) => {
         const keywordTrimmed = String(keyword).trim();
@@ -357,7 +379,6 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
           // 대소문자 구분 없이, 부분 일치로 체크
           const regex = new RegExp(keywordTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
           const found = regex.test(review);
-          console.log(`[검증] 키워드 "${keywordTrimmed}" 검색: ${found ? "찾음" : "누락"} (리뷰: "${review.substring(0, 50)}...")`);
           if (!found) {
             missingRequired.push(keywordTrimmed);
           }
@@ -366,10 +387,7 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
 
       // 필수 키워드가 하나라도 누락되면 실패
       if (missingRequired.length > 0) {
-        console.error(`[검증 실패] 리뷰 ${index + 1}에 필수 키워드 누락:`, missingRequired);
         errors.push(`리뷰 ${index + 1}에 필수 키워드 누락 (${missingRequired.join(", ")})`);
-      } else {
-        console.log(`[검증 성공] 리뷰 ${index + 1}에 모든 필수 키워드 포함됨`);
       }
     }
 

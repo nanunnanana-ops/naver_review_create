@@ -52,24 +52,5 @@
 
   <script src="shared.js?v=20250208"></script>
   <script src="app.js?v=20250208"></script>
-  <script>
-    // 즉시 실행 테스트: 파일이 로드되었는지 확인
-    window.addEventListener('load', function() {
-      console.log('=== 페이지 완전 로드 완료 ===');
-      console.log('현재 시간:', new Date().toISOString());
-
-      // config가 로드되었는지 확인
-      setTimeout(function() {
-        if (typeof config !== 'undefined' && config !== null) {
-          console.log('✅ config 로드됨:', config);
-          console.log('✅ 필수 키워드:', config.requiredKeywords);
-          console.log('✅ 메뉴 개수:', config.menus ? config.menus.length : 0);
-          console.log('✅ 부제목:', config.ui ? config.ui.subtitle : '없음');
-        } else {
-          console.error('❌ config가 로드되지 않음!');
-        }
-      }, 1000);
-    });
-  </script>
 </body>
 </html>

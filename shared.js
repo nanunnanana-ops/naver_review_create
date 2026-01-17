@@ -35,6 +35,12 @@ const DEFAULT_CONFIG = {
 
 // ========== 설정 로드 ==========
 async function loadConfig() {
+  // 하드코딩된 DEFAULT_CONFIG를 항상 사용 (localStorage 무시)
+  console.log('✅ 하드코딩된 DEFAULT_CONFIG 사용:', DEFAULT_CONFIG);
+  return DEFAULT_CONFIG;
+  
+  // 아래 코드는 사용하지 않음 (주석 처리)
+  /*
   if (CONFIG_SOURCE === 'remote') {
     try {
       const response = await fetch(REMOTE_CONFIG_URL);
@@ -50,6 +56,7 @@ async function loadConfig() {
   } else {
     return loadConfigFromLocal();
   }
+  */
 }
 
 function loadConfigFromLocal() {

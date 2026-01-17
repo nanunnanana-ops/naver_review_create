@@ -3,18 +3,25 @@
  * 리뷰 생성 및 UI 인터랙션 처리
  */
 
+console.log('app.js 로드됨');
+
 let config = null;
 
 // ========== 초기화 ==========
 async function init() {
+  console.log('init() 함수 호출됨');
+  
   config = await loadConfig();
   
   // 디버깅: 로드된 설정 확인
   console.log('로드된 설정:', config);
   console.log('필수 키워드:', config.requiredKeywords);
+  console.log('필수 키워드 개수:', config.requiredKeywords ? config.requiredKeywords.length : 0);
   
   applyConfig();
   setupEventListeners();
+  
+  console.log('초기화 완료');
 }
 
 function applyConfig() {

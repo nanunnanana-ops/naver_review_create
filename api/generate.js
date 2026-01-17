@@ -207,18 +207,50 @@ function buildNaturalKeywordInsertions(keywords) {
 
 function buildNaturalLocationSentence(locations) {
   const uniqLocations = Array.from(new Set(locations));
-  const parts = uniqLocations.slice(0, 3);
+  const parts = shuffleArray(uniqLocations).slice(0, 3);
 
   if (parts.length === 1) {
-    return `${parts[0]} 근처라 들르기 편했어요.`;
+    const templates = [
+      `${parts[0]} 근처라 들르기 편했어요.`,
+      `${parts[0]} 인근이라 접근이 쉬웠어요.`,
+      `${parts[0]} 쪽이라 이동이 수월했어요.`,
+      `${parts[0]} 주변이라 자연스럽게 들렀어요.`,
+    ];
+    return pickRandom(templates);
   }
 
   if (parts.length === 2) {
-    return `${parts[0]} 들렀다가 ${parts[1]} 근처에서 식사했어요.`;
+    const [a, b] = parts;
+    const templates = [
+      `${a} 들렀다가 ${b} 근처에서 식사했어요.`,
+      `${a} 쪽에 볼일 보고 ${b} 인근에서 한 끼 했어요.`,
+      `${a} 근처 들렀다가 ${b} 쪽으로 이동하면서 들렀어요.`,
+      `${a} 방문 겸 ${b} 주변에서 식사했어요.`,
+    ];
+    return pickRandom(templates);
   }
 
-  // 3개 이상일 때는 자연스러운 동선 문장으로 묶기
-  return `${parts[0]} 볼일 보고 ${parts[1]} 쪽으로 지나가다가 ${parts[2]} 근처에서 들렀어요.`;
+  const [a, b, c] = parts;
+  const templates = [
+    `${a} 볼일 보고 ${b} 쪽으로 지나가다가 ${c} 근처에서 들렀어요.`,
+    `${a} 근처에 들렀다가 ${b} 인근을 지나며 ${c} 쪽에서 식사했어요.`,
+    `${a} 갔다가 ${b} 방향으로 이동하던 중 ${c} 근처에서 들렀어요.`,
+    `${a} 일정 보고 ${b} 쪽으로 이동하다가 ${c} 주변에서 한 끼 했어요.`,
+  ];
+  return pickRandom(templates);
+}
+
+function pickRandom(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function shuffleArray(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 // ========== 키워드를 자연어 phrase로 변환 ==========

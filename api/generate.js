@@ -1,10 +1,8 @@
 /**
  * Vercel Serverless Function
- * Google Gemini API를 사용하여 리뷰 생성 (무료 티어 제공)
+ * Groq API를 사용하여 리뷰 생성 (무료 티어 제공)
  * 
- * 무료 옵션:
- * 1. Google Gemini API - 월 60회 무료 (권장)
- * 2. Hugging Face Inference API - 완전 무료 (제한적)
+ * Groq는 OpenAI-compatible API를 제공하며 무료 티어가 매우 관대함
  */
 
 export default async function handler(req, res) {
@@ -33,23 +31,18 @@ export default async function handler(req, res) {
     const sideText = sides && sides.length > 0 ? sides.join(', ') : '';
     const keywordsText = keywordsBundle.join(', ');
 
-    // API 선택: GEMINI_API_KEY가 있으면 Gemini, 없으면 Hugging Face
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const huggingFaceKey = process.env.HUGGING_FACE_API_KEY;
+    // API 선택: GROQ_API_KEY가 있으면 Groq, 없으면 템플릿 폴백
+    const groqKey = process.env.GROQ_API_KEY;
 
     let reviews = [];
 
-    if (geminiKey) {
-      // Google Gemini API 사용
-      reviews = await generateWithGemini(menuText, sideText, keywordsText, storeName, targetLength, geminiKey);
-    } else if (huggingFaceKey) {
-      // Hugging Face Inference API 사용
-      reviews = await generateWithHuggingFace(menuText, sideText, keywordsText, storeName, targetLength, huggingFaceKey);
+    if (groqKey) {
+      // Groq API 사용 (OpenAI-compatible)
+      reviews = await generateWithGroq(menuText, sideText, keywordsText, storeName, targetLength, groqKey);
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn('API 키가 없어 템플릿 기반 생성 사용');
-      console.warn('GEMINI_API_KEY:', geminiKey ? '있음 (마스킹됨)' : '없음');
-      console.warn('HUGGING_FACE_API_KEY:', huggingFaceKey ? '있음 (마스킹됨)' : '없음');
+      console.warn('GROQ_API_KEY:', groqKey ? '있음 (마스킹됨)' : '없음');
       reviews = generateFallbackReviews(menuText, sideText, keywordsBundle);
     }
 
@@ -97,8 +90,8 @@ export default async function handler(req, res) {
   }
 }
 
-// ========== Google Gemini API ==========
-async function generateWithGemini(menuText, sideText, keywordsText, storeName, targetLength, apiKey) {
+// ========== Groq API (OpenAI-compatible) ==========
+async function generateWithGroq(menuText, sideText, keywordsText, storeName, targetLength, apiKey) {
   const prompt = `네이버 플레이스 영수증 리뷰를 작성해주세요.
 
 요구사항:
@@ -117,59 +110,75 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ''}
 다른 설명 없이 JSON 배열만 반환해주세요.`;
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          maxOutputTokens: 2000,
-          temperature: 0.8
-        }
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
       })
     });
 
     if (!response.ok) {
       const errorData = await response.text();
-      throw new Error(`Gemini API error: ${errorData}`);
+      throw new Error(`Groq API error: ${errorData}`);
     }
 
     const data = await response.json();
-    const responseText = data.candidates[0].content.parts[0].text.trim();
+    const responseText = data.choices[0]?.message?.content?.trim() || '';
 
     // JSON 배열 추출
     let reviews = [];
     try {
-      // JSON 배열 찾기
-      const jsonMatch = responseText.match(/\[(.*?)\]/s);
-      if (jsonMatch) {
-        reviews = JSON.parse(jsonMatch[0]);
+      // JSON 파싱
+      const parsed = JSON.parse(responseText);
+      // JSON 객체에서 배열 추출
+      if (Array.isArray(parsed.reviews)) {
+        reviews = parsed.reviews;
+      } else if (Array.isArray(parsed)) {
+        reviews = parsed;
       } else {
-        // 직접 파싱 시도
-        reviews = JSON.parse(responseText);
-        if (!Array.isArray(reviews)) {
-          reviews = Object.values(reviews).filter(v => typeof v === 'string');
+        // 객체의 키에서 배열 찾기
+        const keys = Object.keys(parsed);
+        for (const key of keys) {
+          if (Array.isArray(parsed[key])) {
+            reviews = parsed[key];
+            break;
+          }
         }
       }
     } catch (parseError) {
-      // 줄바꿈으로 분리 시도
-      reviews = responseText.split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0 && !line.startsWith('[') && !line.startsWith(']'))
-        .map(line => line.replace(/^["']|["']$/g, '').replace(/^-\s*/, ''))
-        .filter(line => line.length > 10)
-        .slice(0, 3);
+      // JSON 배열 찾기 시도
+      const jsonMatch = responseText.match(/\[(.*?)\]/s);
+      if (jsonMatch) {
+        try {
+          reviews = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          // 줄바꿈으로 분리 시도
+          reviews = responseText.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0 && !line.startsWith('[') && !line.startsWith(']'))
+            .map(line => line.replace(/^["']|["']$/g, '').replace(/^-\s*/, ''))
+            .filter(line => line.length > 200)
+            .slice(0, 3);
+        }
+      }
     }
 
     return reviews.slice(0, 3);
   } catch (error) {
-    console.error('Gemini API error:', error);
+    console.error('Groq API error:', error);
     throw error;
   }
 }

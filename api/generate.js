@@ -181,7 +181,27 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
       keywordsSection = `- 포함할 키워드 (각 리뷰에 자연스럽게 1회씩 포함): ${keywordsText}`;
     }
     
-    const prompt = `네이버 영수증 리뷰 3개를 작성해줘.
+    // 필수 키워드가 있을 때는 간소화된 프롬프트 (필수 키워드 우선)
+    const prompt = requiredKeywords && requiredKeywords.length > 0
+      ? `네이버 영수증 리뷰 3개 작성.
+
+[최우선 필수 조건 - 반드시 지켜야 함]
+- 매장명: ${storeName}
+- 주문: ${menuText}
+${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
+- **필수 키워드 (각 리뷰에 반드시 100% 포함)**: ${requiredKeywordsText || requiredKeywords.join(", ")}
+  → 위 필수 키워드들을 각 리뷰에 자연스럽게 모두 포함해야 합니다. 하나라도 빠지면 안 됩니다.
+
+[기타 요구사항]
+- 각 리뷰 230~320자
+- 비문 금지: "국물했어요", "어국수했어요" 같은 패턴 절대 사용 금지
+- 반복 금지: "다음에도 방문할 예정입니다", "가격 대비 만족스러웠어요" 같은 문구 사용 금지
+- 3개 리뷰는 서로 다른 톤 (담백/감정/디테일)
+
+출력 형식:
+JSON 배열만 출력 (설명 없이)
+["리뷰1","리뷰2","리뷰3"]`
+      : `네이버 영수증 리뷰 3개를 작성해줘.
 
 [필수 조건]
 - 매장명: ${storeName}
@@ -189,31 +209,11 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
 ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
 ${keywordsSection ? keywordsSection + "\n" : ""}
 
-[작성 규칙 - 절대 위반 금지]
+[작성 규칙]
 1. 길이: 각 리뷰 230~320자
-2. 비문 절대 금지:
-   ❌ "국물했어요", "어국수했어요", "어국수하고 국물했어요" 같은 패턴
-   ✅ "국물이 진했어요", "어국수에서 먹었어요", "어국수 맛이 좋았어요"
-   - 명사 뒤에는 반드시 조사(이/가/을/를/에서/의 등)를 붙이고, 동사/형용사로 연결
-   - "X하고 Y했어요" 같은 비문 절대 금지
-
-3. 반복 금지 (같은 문장/표현을 리뷰 내에서 또는 3개 리뷰 간에 반복 불가):
-${forbiddenPhrases.map(p => `   - "${p}"`).join('\n')}
-   - 위 문구들은 절대 사용하지 마세요
-
-4. 각 리뷰마다 다른 톤:
-   1) 담백/정보형: 사실만 간단히 서술
-   2) 감정 후기형: 약간의 감정 표현 포함
-   3) 디테일 묘사형: 구체적인 묘사와 경험
-
-5. 필수 키워드 포함 (절대 필수):
-${requiredKeywordsText ? `   - 필수 키워드는 위 [필수 조건]에 명시된 "필수 키워드"를 의미합니다` : ""}
-${requiredKeywords && requiredKeywords.length > 0 ? `   - 필수 키워드 목록 (원본): ${requiredKeywords.join(", ")}` : ""}
-   - 위 필수 키워드들은 각 리뷰마다 반드시 100% 자연스럽게 포함해야 합니다
-   - 키워드를 나열하지 말고 문장 속에 자연스럽게 녹여야 합니다
-   - 필수 키워드가 하나라도 누락되면 안 됩니다
-
-${attempt > 0 ? `[중요] 이전 결과에서 키워드 포함 부족, 비문, 또는 반복이 발견되었습니다. 위 규칙을 더욱 엄격히 준수하세요. 특히 키워드를 반드시 포함하세요.` : ""}
+2. 비문 절대 금지: "국물했어요", "어국수했어요" 같은 패턴
+3. 반복 금지: ${forbiddenPhrases.slice(0, 3).join(", ")} 같은 문구 사용 금지
+4. 3개 리뷰는 서로 다른 톤
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)

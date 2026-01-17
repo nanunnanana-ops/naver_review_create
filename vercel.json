@@ -2,7 +2,7 @@
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/admin/", "destination": "/admin.html" },
-    { "source": "/((?!.*\\.html).*)", "destination": "/index.html" }
+    { "source": "/((?!.*\\.html).*)", "destination": "/index-v2.html" }
   ],
   "headers": [
     {

@@ -68,9 +68,26 @@ function setupEventListeners() {
 function loadConfigToForm() {
   if (!pinVerified) return;
 
+  console.log('loadConfigToForm 호출됨');
+  console.log('config.requiredKeywords:', config.requiredKeywords);
+  console.log('config.promoKeywordsPool:', config.promoKeywordsPool);
+
   document.getElementById('storeName').value = config.storeName || '';
-  document.getElementById('requiredKeywords').value = config.requiredKeywords.join(', ');
-  document.getElementById('promoKeywordsPool').value = config.promoKeywordsPool.join(', ');
+  
+  // 필수 키워드 로드
+  const requiredKeywordsValue = Array.isArray(config.requiredKeywords) 
+    ? config.requiredKeywords.join(', ') 
+    : (config.requiredKeywords || '');
+  document.getElementById('requiredKeywords').value = requiredKeywordsValue;
+  console.log('필수 키워드 필드에 설정된 값:', requiredKeywordsValue);
+  
+  // 프로모션 키워드 풀 로드
+  const promoKeywordsValue = Array.isArray(config.promoKeywordsPool) 
+    ? config.promoKeywordsPool.join(', ') 
+    : (config.promoKeywordsPool || '');
+  document.getElementById('promoKeywordsPool').value = promoKeywordsValue;
+  console.log('프로모션 키워드 필드에 설정된 값:', promoKeywordsValue);
+  
   document.getElementById('menus').value = config.menus.join('\n');
   document.getElementById('sides').value = config.sides.join(', ');
   document.getElementById('themeBg').value = config.ui.themeBg || '#FDFBF8';

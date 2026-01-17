@@ -96,7 +96,12 @@ function downloadConfig(config) {
 
 // ========== 유틸리티 함수 ==========
 function parseCommaSeparated(str) {
-  return str.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  if (!str || typeof str !== 'string') {
+    return [];
+  }
+  const result = str.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  console.log('parseCommaSeparated 입력:', str, '결과:', result);
+  return result;
 }
 
 function parseNewlineOrComma(str) {

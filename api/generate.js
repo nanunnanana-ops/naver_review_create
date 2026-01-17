@@ -46,36 +46,22 @@ export default async function handler(req, res) {
       reviews = generateFallbackReviews(menuText, sideText, keywordsBundle || []);
     }
 
-    // 최소 3개 리뷰 보장
+    // 최소 3개 리뷰 보장 (API 호출 실패 시에만)
     if (reviews.length < 3) {
+      console.warn("리뷰가 3개 미만, 기본 템플릿 사용");
       const kb = keywordsBundle || [];
-      const templates = [
-        `${menuText} 먹었는데 맛있었어요. ${kb[0] || "좋았어요"}.`,
-        `${menuText} 주문했어요. ${kb[1] || "만족스러웠어요"}.`,
-        `${menuText} 시켰는데 ${kb[2] || "괜찮았어요"}.`,
-      ];
-      while (reviews.length < 3) {
-        reviews.push(templates[reviews.length] || `${menuText} 먹었어요.`);
-      }
+      reviews = generateFallbackReviews(menuText, sideText, kb);
     }
 
-    // 글자 수 조정 (200~400글자)
-    reviews = reviews.map((review) => {
+    // 길이 검증만 수행 (후처리로 늘리지 않음)
+    reviews = reviews.map((review, index) => {
       const length = review.length;
-      if (length < 200) {
-        // 짧으면 내용 추가
-        const additions = [
-          " 다음에도 방문할 예정입니다.",
-          " 가격 대비 만족스러웠어요.",
-          " 친구들에게도 추천하고 싶습니다.",
-          " 분위기도 좋고 맛도 좋았습니다.",
-        ];
-        const addition = additions[Math.floor(Math.random() * additions.length)];
-        return review + addition;
-      } else if (length > 400) {
-        // 길면 자르기
+      // 400자 초과 시에만 자르기
+      if (length > 400) {
+        console.warn(`리뷰 ${index + 1}이 너무 김 (${length}자), 자름`);
         return review.substring(0, 397) + "...";
       }
+      // 200자 미만이어도 후처리로 늘리지 않음 (API가 생성한 그대로 사용)
       return review;
     });
 
@@ -93,145 +79,183 @@ export default async function handler(req, res) {
 
 // ========== Groq API (OpenAI-compatible) ==========
 async function generateWithGroq(menuText, sideText, keywordsText, storeName, targetLength, apiKey) {
-  const prompt = `네이버 플레이스 영수증 리뷰를 작성해주세요.
+  const keywordsList = keywordsText ? keywordsText.split(", ").filter((k) => k.trim()) : [];
+  
+  // 검증 및 재시도 로직
+  let reviews = null;
+  let temperature = 0.8;
+  const maxRetries = 2;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const prompt = `네이버 영수증 리뷰 3개를 작성해줘.
 
-요구사항:
+조건:
 - 매장명: ${storeName}
-- 주문한 메뉴: ${menuText}
+- 주문: ${menuText}
 ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
-- 반드시 포함할 키워드: ${keywordsText}
-- 글자 수: ${targetLength || 300}글자 내외 (200~400글자)
-- 자연스럽고 진짜 손님이 쓴 것 같은 말투로 작성
-- 키워드는 문장 속에 자연스럽게 1회씩만 포함
-- 키워드를 나열하지 말고 문장으로 자연스럽게 표현
-- 3개의 서로 다른 스타일의 리뷰를 작성 (말투, 감정 강도, 문장 구조가 다르게)
+${keywordsList.length > 0 ? `- 포함 키워드(각 리뷰에 자연스럽게 1회만): ${keywordsText}` : ""}
+- 각 리뷰는 230~320자
+- 말투는 실제 방문자가 쓴 자연스러운 한국어(과장 X)
+- 같은 문장/표현 반복 금지
+${attempt > 0 ? "- 특히 \"친절\", \"추천\", \"가격 대비\", \"재방문\", \"또 올게요\" 같은 상투어 반복 금지" : ""}
+- 비문 금지(예: "국물했어요" 같은 어색한 표현 금지)
+- 3개는 서로 톤이 달라야 함:
+  1) 담백/정보형  2) 감정 조금 있는 후기형  3) 디테일 묘사형
 
-응답 형식: JSON 배열로 3개의 리뷰만 반환
-예시: ["리뷰1", "리뷰2", "리뷰3"]
-다른 설명 없이 JSON 배열만 반환해주세요.`;
+출력 형식:
+반드시 JSON 배열만 출력
+["리뷰1","리뷰2","리뷰3"]`;
 
-  try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.8,
-        max_tokens: 2000,
-        response_format: { type: "json_object" },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`Groq API error: ${errorData}`);
-    }
-
-    const data = await response.json();
-    const responseText = data.choices[0]?.message?.content?.trim() || "";
-
-    // JSON 배열 추출
-    let reviews = [];
     try {
-      // JSON 파싱
-      const parsed = JSON.parse(responseText);
-      // JSON 객체에서 배열 추출
-      if (Array.isArray(parsed.reviews)) {
-        reviews = parsed.reviews;
-      } else if (Array.isArray(parsed)) {
-        reviews = parsed;
-      } else {
-        // 객체의 키에서 배열 찾기
-        const keys = Object.keys(parsed);
-        for (const key of keys) {
-          if (Array.isArray(parsed[key])) {
-            reviews = parsed[key];
-            break;
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "llama-3.1-8b-instant",
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          temperature: temperature,
+          max_tokens: 2000,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Groq API error: ${errorData}`);
+      }
+
+      const data = await response.json();
+      const responseText = data.choices[0]?.message?.content?.trim() || "";
+
+      // JSON 배열 추출
+      let extractedReviews = [];
+      try {
+        // JSON 배열 직접 파싱 시도
+        const jsonMatch = responseText.match(/\[(.*?)\]/s);
+        if (jsonMatch) {
+          extractedReviews = JSON.parse(jsonMatch[0]);
+        } else {
+          // 직접 파싱 시도
+          const parsed = JSON.parse(responseText);
+          if (Array.isArray(parsed)) {
+            extractedReviews = parsed;
+          } else if (Array.isArray(parsed.reviews)) {
+            extractedReviews = parsed.reviews;
+          } else {
+            // 객체의 키에서 배열 찾기
+            const keys = Object.keys(parsed);
+            for (const key of keys) {
+              if (Array.isArray(parsed[key])) {
+                extractedReviews = parsed[key];
+                break;
+              }
+            }
           }
         }
+      } catch (parseError) {
+        console.warn("JSON 파싱 실패, 재시도:", parseError.message);
+        if (attempt < maxRetries - 1) {
+          temperature = 0.4; // 재시도 시 temperature 낮춤
+          continue;
+        }
+        throw new Error("JSON 파싱 실패");
       }
-    } catch (parseError) {
-      // JSON 배열 찾기 시도
-      const jsonMatch = responseText.match(/\[(.*?)\]/s);
-      if (jsonMatch) {
-        try {
-          reviews = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          // 줄바꿈으로 분리 시도
-          reviews = responseText
-            .split("\n")
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0 && !line.startsWith("[") && !line.startsWith("]"))
-            .map((line) => line.replace(/^["']|["']$/g, "").replace(/^-\s*/, ""))
-            .filter((line) => line.length > 200)
-            .slice(0, 3);
+
+      // 검증
+      const validation = validateReviews(extractedReviews, keywordsList);
+      if (validation.isValid) {
+        reviews = extractedReviews;
+        break;
+      } else {
+        console.warn(`검증 실패 (시도 ${attempt + 1}/${maxRetries}):`, validation.errors);
+        if (attempt < maxRetries - 1) {
+          temperature = 0.4; // 재시도 시 temperature 낮춤
         }
       }
+    } catch (error) {
+      console.error(`Groq API error (시도 ${attempt + 1}/${maxRetries}):`, error);
+      if (attempt === maxRetries - 1) {
+        throw error;
+      }
+      temperature = 0.4; // 재시도 시 temperature 낮춤
+    }
+  }
+
+  // 검증 실패하거나 null이면 최소한의 리뷰 반환
+  if (!reviews || reviews.length < 3) {
+    console.warn("검증 실패 또는 리뷰 부족, 기본 리뷰 반환");
+    return generateFallbackReviews(menuText, sideText, keywordsList);
+  }
+
+  return reviews;
+}
+
+// 검증 함수
+function validateReviews(reviews, keywordsList) {
+  const errors = [];
+
+  // 배열 3개인지 확인
+  if (!Array.isArray(reviews) || reviews.length !== 3) {
+    errors.push(`리뷰가 3개가 아님 (현재: ${reviews?.length || 0}개)`);
+    return { isValid: false, errors };
+  }
+
+  // 각 리뷰 검증
+  reviews.forEach((review, index) => {
+    if (typeof review !== "string") {
+      errors.push(`리뷰 ${index + 1}이 문자열이 아님`);
+      return;
     }
 
-    return reviews.slice(0, 3);
-  } catch (error) {
-    console.error("Groq API error:", error);
-    throw error;
-  }
+    const length = review.length;
+
+    // 길이 검증 (230~320자 목표, 200~400 허용 범위)
+    if (length < 200 || length > 400) {
+      errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 목표: 230~320자, 허용: 200~400자)`);
+    }
+
+    // 키워드 검증 (각 키워드가 1회만 포함되어야 함)
+    keywordsList.forEach((keyword) => {
+      const keywordTrimmed = keyword.trim();
+      if (keywordTrimmed) {
+        const regex = new RegExp(keywordTrimmed, "g");
+        const matches = review.match(regex);
+        const count = matches ? matches.length : 0;
+
+        if (count === 0) {
+          errors.push(`리뷰 ${index + 1}에 키워드 "${keywordTrimmed}" 없음`);
+        } else if (count > 1) {
+          errors.push(`리뷰 ${index + 1}에 키워드 "${keywordTrimmed}" ${count}회 포함 (1회만 허용)`);
+        }
+      }
+    });
+  });
+
+  return {
+    isValid: errors.length === 0,
+    errors: errors,
+  };
 }
 
 // ========== 템플릿 기반 폴백 ==========
 function generateFallbackReviews(menuText, sideText, keywordsBundle) {
-  const templates = [
-    () => {
-      const k1 = keywordsBundle[0] || "맛있었어요";
-      const k2 = keywordsBundle[1] || "좋았어요";
-      if (sideText) {
-        return `${menuText} 먹었는데 ${k1}하고 ${k2}했어요. ${sideText}도 괜찮았습니다.`;
-      }
-      return `${menuText} 먹었는데 ${k1}하고 ${k2}했어요. 다음에 또 올게요.`;
-    },
-    () => {
-      const k1 = keywordsBundle[0] || "맛있었어요";
-      if (sideText) {
-        return `${menuText} 주문했어요. ${k1}하고 ${sideText}도 함께 먹으니 좋았습니다.`;
-      }
-      return `${menuText} 주문했어요. ${k1}해서 만족스러웠어요.`;
-    },
-    () => {
-      const k1 = keywordsBundle[0] || "괜찮았어요";
-      const k2 = keywordsBundle[1] || "좋았어요";
-      if (sideText) {
-        return `${menuText} 시켰는데 ${k1}했어요. ${sideText}도 ${k2}습니다.`;
-      }
-      return `${menuText} 시켰는데 ${k1}했어요. ${k2}습니다.`;
-    },
+  const k1 = keywordsBundle[0] || "";
+  const k2 = keywordsBundle[1] || "";
+  const k3 = keywordsBundle[2] || "";
+
+  // 간단한 템플릿 (후처리로 늘리지 않음)
+  const reviews = [
+    `${menuText}${k1 ? ` ${k1}` : ""} 먹었어요.${sideText ? ` ${sideText}도 주문했는데 괜찮았습니다.` : ""} ${menuText}의 맛이 제대로 느껴졌어요.`,
+    `${menuText} 주문했습니다.${k2 ? ` ${k2}했고` : ""} 포장 상태도 좋았어요.${sideText ? ` ${sideText}도 함께 시켰는데` : ""} 괜찮았습니다.`,
+    `${menuText} 시켰어요.${k3 ? ` ${k3}` : ""} 했고 양도 충분했습니다.${sideText ? ` ${sideText}도` : ""} 같이 먹으니 좋았어요.`,
   ];
 
-  return templates.map((template) => {
-    let review = template();
-    // 200~400글자 내외로 조정
-    while (review.length < 200) {
-      const additions = [
-        " 다음에도 방문할 예정입니다.",
-        " 가격 대비 만족스러웠어요.",
-        " 친구들에게도 추천하고 싶습니다.",
-        " 분위기도 좋고 맛도 좋았습니다.",
-        " 사장님도 친절하시고 음식도 맛있었어요.",
-        " 자주 찾을 수 있을 것 같습니다.",
-        " 주변에 소개하고 싶은 맛집입니다.",
-      ];
-      const addition = additions[Math.floor(Math.random() * additions.length)];
-      review = review + addition;
-    }
-    if (review.length > 400) {
-      review = review.substring(0, 397) + "...";
-    }
-    return review;
-  });
+  return reviews;
 }

@@ -55,13 +55,26 @@ async function loadConfig() {
 function loadConfigFromLocal() {
   try {
     const saved = localStorage.getItem('reviewGeneratorConfig');
+    console.log('localStorage에서 읽은 원본 데이터:', saved);
+    
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...DEFAULT_CONFIG, ...parsed };
+      console.log('파싱된 설정:', parsed);
+      console.log('파싱된 필수 키워드:', parsed.requiredKeywords);
+      console.log('파싱된 필수 키워드 타입:', typeof parsed.requiredKeywords, Array.isArray(parsed.requiredKeywords));
+      
+      const merged = { ...DEFAULT_CONFIG, ...parsed };
+      console.log('병합된 설정:', merged);
+      console.log('병합된 필수 키워드:', merged.requiredKeywords);
+      console.log('병합된 필수 키워드 개수:', merged.requiredKeywords ? merged.requiredKeywords.length : 0);
+      
+      return merged;
     }
   } catch (error) {
     console.error('Local config load failed:', error);
   }
+  
+  console.log('기본 설정 사용:', DEFAULT_CONFIG);
   return DEFAULT_CONFIG;
 }
 
@@ -72,10 +85,27 @@ function saveConfig(config) {
     return false;
   } else {
     try {
-      localStorage.setItem('reviewGeneratorConfig', JSON.stringify(config));
+      console.log('saveConfig 호출됨 - 저장할 설정:', config);
+      console.log('저장할 필수 키워드:', config.requiredKeywords);
+      console.log('저장할 필수 키워드 타입:', typeof config.requiredKeywords, Array.isArray(config.requiredKeywords));
+      
+      const jsonString = JSON.stringify(config);
+      console.log('JSON 문자열로 변환:', jsonString);
+      console.log('JSON 문자열 길이:', jsonString.length);
+      
+      localStorage.setItem('reviewGeneratorConfig', jsonString);
+      
+      // 저장 후 즉시 확인
+      const verify = localStorage.getItem('reviewGeneratorConfig');
+      const verifyParsed = JSON.parse(verify);
+      console.log('저장 후 확인 - 읽은 값:', verifyParsed);
+      console.log('저장 후 확인 - 필수 키워드:', verifyParsed.requiredKeywords);
+      console.log('저장 후 확인 - 필수 키워드 개수:', verifyParsed.requiredKeywords ? verifyParsed.requiredKeywords.length : 0);
+      
       return true;
     } catch (error) {
       console.error('Local config save failed:', error);
+      console.error('에러 스택:', error.stack);
       return false;
     }
   }

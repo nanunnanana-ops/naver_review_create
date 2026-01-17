@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { storeName, menus, sides, keywordsBundle, targetLength, nonce } = req.body;
+    const { storeName, menus, sides, keywordsBundle, requiredKeywords, targetLength, nonce } = req.body;
 
     if (!menus || menus.length === 0) {
       return res.status(400).json({ error: "메뉴가 필요합니다" });
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
     if (groqKey) {
       // Groq API 사용 (OpenAI-compatible)
-      reviews = await generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, storeName, targetLength, groqKey);
+      reviews = await generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords || [], storeName, targetLength, groqKey);
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn("API 키가 없어 템플릿 기반 생성 사용");
@@ -113,7 +113,7 @@ function convertKeywordsToPhrases(keywordsBundle) {
 }
 
 // ========== Groq API (OpenAI-compatible) ==========
-async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, storeName, targetLength, apiKey) {
+async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords, storeName, targetLength, apiKey) {
   const keywordsList = keywordsPhrases || (keywordsText ? keywordsText.split(", ").filter((k) => k.trim()) : []);
   
   // 검증 및 재시도 로직
@@ -159,9 +159,10 @@ ${forbiddenPhrases.map(p => `   - "${p}"`).join('\n')}
    2) 감정 후기형: 약간의 감정 표현 포함
    3) 디테일 묘사형: 구체적인 묘사와 경험
 
-5. 키워드 포함 (최우선): 위에 나열한 키워드들을 반드시 각 리뷰에 자연스럽게 포함해야 합니다
+5. 필수 키워드 포함 (절대 필수): 다음 키워드들은 반드시 각 리뷰에 100% 포함되어야 합니다
+${requiredKeywords && requiredKeywords.length > 0 ? `   - 필수 키워드: ${requiredKeywords.join(", ")}` : ""}
+   - 위 필수 키워드들은 각 리뷰마다 반드시 자연스럽게 포함해야 합니다
    - 키워드를 나열하지 말고 문장 속에 자연스럽게 녹여야 합니다
-   - 각 리뷰마다 최소 3개 이상의 키워드가 포함되어야 합니다
 
 ${attempt > 0 ? `[중요] 이전 결과에서 키워드 포함 부족, 비문, 또는 반복이 발견되었습니다. 위 규칙을 더욱 엄격히 준수하세요. 특히 키워드를 반드시 포함하세요.` : ""}
 
@@ -232,7 +233,7 @@ JSON 배열만 출력 (설명 없이)
       }
 
       // 검증
-      const validation = validateReviews(extractedReviews, keywordsList, originalKeywords);
+      const validation = validateReviews(extractedReviews, keywordsList, originalKeywords, requiredKeywords);
       
       // 비문 패턴 체크
       const hasGrammaticalError = checkGrammaticalErrors(extractedReviews);
@@ -271,7 +272,7 @@ JSON 배열만 출력 (설명 없이)
 }
 
 // 검증 함수
-function validateReviews(reviews, keywordsList, originalKeywords = []) {
+function validateReviews(reviews, keywordsList, originalKeywords = [], requiredKeywords = []) {
   const errors = [];
 
   // 배열 3개인지 확인
@@ -294,29 +295,44 @@ function validateReviews(reviews, keywordsList, originalKeywords = []) {
       errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 목표: 230~320자, 허용: 200~400자)`);
     }
 
-    // 키워드 검증 강화: 원본 키워드 목록으로 체크
-    let keywordFoundCount = 0;
-    const missingKeywords = [];
-    
-    originalKeywords.forEach((keyword) => {
-      const keywordTrimmed = String(keyword).trim();
-      if (keywordTrimmed) {
-        // 대소문자 구분 없이, 부분 일치로 체크 (더 관대하게)
-        const regex = new RegExp(keywordTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
-        if (regex.test(review)) {
-          keywordFoundCount++;
-        } else {
-          missingKeywords.push(keywordTrimmed);
+    // 필수 키워드 검증: 100% 포함 필수
+    if (requiredKeywords && requiredKeywords.length > 0) {
+      const missingRequired = [];
+      
+      requiredKeywords.forEach((keyword) => {
+        const keywordTrimmed = String(keyword).trim();
+        if (keywordTrimmed) {
+          // 대소문자 구분 없이, 부분 일치로 체크
+          const regex = new RegExp(keywordTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+          if (!regex.test(review)) {
+            missingRequired.push(keywordTrimmed);
+          }
         }
-      }
-    });
+      });
 
-    // 각 리뷰에는 최소한 키워드의 30% 이상이 포함되어야 함
-    const minRequired = Math.ceil(originalKeywords.length * 0.3);
-    if (keywordFoundCount < minRequired && originalKeywords.length > 0) {
-      errors.push(`리뷰 ${index + 1}에 키워드 포함 부족 (${keywordFoundCount}/${originalKeywords.length}개, 최소 ${minRequired}개 필요)`);
-      if (missingKeywords.length > 0) {
-        errors.push(`  - 누락된 키워드: ${missingKeywords.slice(0, 3).join(", ")}${missingKeywords.length > 3 ? "..." : ""}`);
+      // 필수 키워드가 하나라도 누락되면 실패
+      if (missingRequired.length > 0) {
+        errors.push(`리뷰 ${index + 1}에 필수 키워드 누락 (${missingRequired.join(", ")})`);
+      }
+    }
+
+    // 전체 키워드 검증: 나머지 키워드는 일부 포함되면 OK
+    const otherKeywords = originalKeywords.filter(k => !requiredKeywords || !requiredKeywords.includes(k));
+    if (otherKeywords.length > 0) {
+      let keywordFoundCount = 0;
+      otherKeywords.forEach((keyword) => {
+        const keywordTrimmed = String(keyword).trim();
+        if (keywordTrimmed) {
+          const regex = new RegExp(keywordTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+          if (regex.test(review)) {
+            keywordFoundCount++;
+          }
+        }
+      });
+
+      // 전체 키워드 중 최소 1개 이상 포함 권장 (필수는 아님, 필수 키워드가 이미 체크됨)
+      if (keywordFoundCount === 0 && otherKeywords.length > 0) {
+        // 경고만 표시, 에러는 아님 (필수 키워드만 필수)
       }
     }
   });

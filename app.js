@@ -135,21 +135,22 @@ async function handleGenerate() {
         attempts++;
       }
     } else {
-      // 서버 모드: API 호출
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          storeName: config.storeName,
-          menus: selectedMenus,
-          sides: selectedSides,
-          keywordsBundle: keywordsBundle,
-          targetLength: 300, // 200~400글자 내외
-          nonce: nonce
-        })
-      });
+    // 서버 모드: API 호출
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        storeName: config.storeName,
+        menus: selectedMenus,
+        sides: selectedSides,
+        keywordsBundle: keywordsBundle,
+        requiredKeywords: config.requiredKeywords || [], // 필수 키워드 별도 전송
+        targetLength: 300, // 200~400글자 내외
+        nonce: nonce
+      })
+    });
 
       if (!response.ok) {
         const errorText = await response.text();

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalStorage 디버깅</title>
+</head>
+<body>
+  <h1>LocalStorage 디버깅 도구</h1>
+  <div style="padding: 20px;">
+    <h2>1. 저장된 설정 확인</h2>
+    <button onclick="checkStorage()">LocalStorage 확인</button>
+    <pre id="storageOutput" style="background: #f0f0f0; padding: 10px; margin-top: 10px;"></pre>
+
+    <h2>2. 수동 저장 테스트</h2>
+    <label>필수 키워드 (쉼표로 구분):</label><br>
+    <input type="text" id="testKeywords" value="어국수, 국물, 시원, 깔끔" style="width: 300px; padding: 5px;"><br><br>
+    <button onclick="testSave()">저장 테스트</button>
+    <pre id="saveOutput" style="background: #f0f0f0; padding: 10px; margin-top: 10px;"></pre>
+
+    <h2>3. LocalStorage 완전 삭제</h2>
+    <button onclick="clearStorage()" style="background: red; color: white; padding: 10px;">LocalStorage 삭제</button>
+  </div>
+
+  <script>
+    function checkStorage() {
+      const output = document.getElementById('storageOutput');
+      const saved = localStorage.getItem('reviewGeneratorConfig');
+      
+      if (!saved) {
+        output.textContent = '저장된 설정이 없습니다.';
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(saved);
+        output.textContent = JSON.stringify(parsed, null, 2) + 
+          '\n\n필수 키워드: ' + JSON.stringify(parsed.requiredKeywords) +
+          '\n필수 키워드 개수: ' + (parsed.requiredKeywords ? parsed.requiredKeywords.length : 0);
+      } catch (e) {
+        output.textContent = '파싱 에러: ' + e.message + '\n\n원본: ' + saved;
+      }
+    }
+
+    function testSave() {
+      const output = document.getElementById('saveOutput');
+      const input = document.getElementById('testKeywords').value;
+      const keywords = input.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+      const testConfig = {
+        storeName: "어국수",
+        requiredKeywords: keywords,
+        promoKeywordsPool: ["시원", "깔끔", "매콤"],
+        menus: ["어묵국수", "얼큰바지락국수"],
+        sides: ["소주", "맥주", "없음"],
+        lengthOptions: { short: 2, normal: 3, long: 4 },
+        ui: {
+          themeBg: "#FDFBF8",
+          accent: "#C0362C",
+          subtitle: "테스트"
+        }
+      };
+
+      try {
+        localStorage.setItem('reviewGeneratorConfig', JSON.stringify(testConfig));
+        
+        // 확인
+        const verify = localStorage.getItem('reviewGeneratorConfig');
+        const verifyParsed = JSON.parse(verify);
+        
+        output.textContent = '저장 성공!\n\n' +
+          '저장한 필수 키워드: ' + JSON.stringify(keywords) +
+          '\n저장한 필수 키워드 개수: ' + keywords.length +
+          '\n\n확인한 필수 키워드: ' + JSON.stringify(verifyParsed.requiredKeywords) +
+          '\n확인한 필수 키워드 개수: ' + (verifyParsed.requiredKeywords ? verifyParsed.requiredKeywords.length : 0);
+      } catch (e) {
+        output.textContent = '저장 에러: ' + e.message;
+      }
+    }
+
+    function clearStorage() {
+      if (confirm('LocalStorage를 완전히 삭제하시겠습니까?')) {
+        localStorage.removeItem('reviewGeneratorConfig');
+        alert('삭제 완료!');
+        checkStorage();
+      }
+    }
+
+    // 페이지 로드 시 자동 확인
+    window.addEventListener('load', checkStorage);
+  </script>
+</body>
+</html>

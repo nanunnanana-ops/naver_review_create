@@ -2,8 +2,7 @@
   "rewrites": [
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/admin/", "destination": "/admin.html" },
-    { "source": "/test-localstorage.html", "destination": "/test-localstorage.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!.*\\.html).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

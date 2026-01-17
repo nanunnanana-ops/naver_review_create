@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>localStorage 테스트</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    pre { background: #f5f5f5; padding: 10px; border-radius: 4px; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>localStorage 디버깅 도구</h1>
+  
+  <h2>1. 현재 저장된 데이터 확인</h2>
+  <button onclick="checkStorage()">저장된 데이터 확인</button>
+  <pre id="storageOutput"></pre>
+  
+  <h2>2. 필수 키워드 직접 확인</h2>
+  <button onclick="checkKeywords()">필수 키워드 확인</button>
+  <pre id="keywordsOutput"></pre>
+  
+  <h2>3. 데이터 수동 설정 (테스트용)</h2>
+  <button onclick="setTestData()">테스트 데이터 설정</button>
+  <pre id="testOutput"></pre>
+  
+  <h2>4. 데이터 전체 삭제</h2>
+  <button onclick="clearStorage()" style="background: #ff4444; color: white;">전체 삭제</button>
+  
+  <script>
+    function checkStorage() {
+      const saved = localStorage.getItem('reviewGeneratorConfig');
+      const output = document.getElementById('storageOutput');
+      
+      if (!saved) {
+        output.textContent = '❌ localStorage에 데이터가 없습니다.';
+        return;
+      }
+      
+      try {
+        const parsed = JSON.parse(saved);
+        output.textContent = JSON.stringify(parsed, null, 2);
+        console.log('저장된 데이터:', parsed);
+        console.log('필수 키워드:', parsed.requiredKeywords);
+        console.log('필수 키워드 타입:', typeof parsed.requiredKeywords, Array.isArray(parsed.requiredKeywords));
+      } catch (e) {
+        output.textContent = '❌ 파싱 실패: ' + e.message + '\n\n원본 데이터:\n' + saved;
+      }
+    }
+    
+    function checkKeywords() {
+      const saved = localStorage.getItem('reviewGeneratorConfig');
+      const output = document.getElementById('keywordsOutput');
+      
+      if (!saved) {
+        output.textContent = '❌ 데이터가 없습니다.';
+        return;
+      }
+      
+      try {
+        const parsed = JSON.parse(saved);
+        const requiredKeywords = parsed.requiredKeywords;
+        
+        output.textContent = 
+          '타입: ' + typeof requiredKeywords + '\n' +
+          '배열 여부: ' + Array.isArray(requiredKeywords) + '\n' +
+          '값: ' + JSON.stringify(requiredKeywords) + '\n' +
+          '개수: ' + (requiredKeywords ? (requiredKeywords.length || 0) : 0) + '\n\n' +
+          '전체 객체:\n' + JSON.stringify(parsed, null, 2);
+      } catch (e) {
+        output.textContent = '❌ 오류: ' + e.message;
+      }
+    }
+    
+    function setTestData() {
+      const testConfig = {
+        storeName: "테스트 매장",
+        requiredKeywords: ["테스트1", "테스트2", "테스트3", "테스트4"],
+        promoKeywordsPool: ["프로모1", "프로모2"],
+        menus: ["메뉴1", "메뉴2"],
+        sides: ["사이드1"],
+        ui: {
+          themeBg: "#FDFBF8",
+          accent: "#C0362C",
+          subtitle: "테스트"
+        }
+      };
+      
+      localStorage.setItem('reviewGeneratorConfig', JSON.stringify(testConfig));
+      document.getElementById('testOutput').textContent = 
+        '✅ 테스트 데이터 저장 완료!\n\n' + 
+        JSON.stringify(testConfig, null, 2);
+      
+      // 저장 후 즉시 확인
+      const verify = localStorage.getItem('reviewGeneratorConfig');
+      const verifyParsed = JSON.parse(verify);
+      console.log('저장 후 확인:', verifyParsed);
+      console.log('필수 키워드:', verifyParsed.requiredKeywords);
+    }
+    
+    function clearStorage() {
+      if (confirm('정말 localStorage의 모든 데이터를 삭제하시겠습니까?')) {
+        localStorage.removeItem('reviewGeneratorConfig');
+        alert('삭제 완료!');
+        document.getElementById('storageOutput').textContent = '';
+        document.getElementById('keywordsOutput').textContent = '';
+      }
+    }
+    
+    // 페이지 로드 시 자동으로 확인
+    window.addEventListener('load', () => {
+      checkStorage();
+      checkKeywords();
+    });
+  </script>
+</body>
+</html>

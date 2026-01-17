@@ -39,6 +39,12 @@ export default async function handler(req, res) {
     const keywordsPhrases = convertKeywordsToPhrases(keywordsBundle || []);
     const keywordsText = keywordsPhrases.join(", ");
     
+    // 필수 키워드를 phrase로 변환 (프롬프트에 명확히 표시)
+    const requiredKeywordsPhrases = requiredKeywords && requiredKeywords.length > 0
+      ? convertKeywordsToPhrases(requiredKeywords)
+      : [];
+    const requiredKeywordsText = requiredKeywordsPhrases.join(", ");
+    
     // 원본 키워드 목록 (검증용 - phrase 변환 전)
     const originalKeywords = keywordsBundle || [];
 
@@ -49,7 +55,11 @@ export default async function handler(req, res) {
 
     if (groqKey) {
       // Groq API 사용 (OpenAI-compatible)
-      reviews = await generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords || [], storeName, targetLength, groqKey);
+      const requiredKeywordsPhrases = requiredKeywords && requiredKeywords.length > 0
+        ? convertKeywordsToPhrases(requiredKeywords)
+        : [];
+      const requiredKeywordsText = requiredKeywordsPhrases.join(", ");
+      reviews = await generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords || [], requiredKeywordsText, storeName, targetLength, groqKey);
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn("API 키가 없어 템플릿 기반 생성 사용");
@@ -113,13 +123,16 @@ function convertKeywordsToPhrases(keywordsBundle) {
 }
 
 // ========== Groq API (OpenAI-compatible) ==========
-async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords, storeName, targetLength, apiKey) {
+async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords, requiredKeywordsText, storeName, targetLength, apiKey) {
   const keywordsList = keywordsPhrases || (keywordsText ? keywordsText.split(", ").filter((k) => k.trim()) : []);
   
   // 검증 및 재시도 로직
   let reviews = null;
   let temperature = 0.8;
   const maxRetries = 4; // 비문/키워드 검증 포함해서 4회로 증가
+  
+  // 필수 키워드 phrase 배열 추출 (검증용)
+  const requiredKeywordsPhrasesArray = requiredKeywordsText ? requiredKeywordsText.split(", ") : [];
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     // 반복 금지 문구 리스트
@@ -133,14 +146,35 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
       "가격 대비"
     ];
     
+    // 프롬프트 구성 - 필수 키워드를 명확히 구분
+    let keywordsSection = "";
+    if (requiredKeywordsText) {
+      keywordsSection = `- 필수 키워드 (각 리뷰에 100% 반드시 포함): ${requiredKeywordsText}`;
+      if (keywordsText && keywordsText !== requiredKeywordsText) {
+        // 선택 키워드가 있으면 추가 (필수 키워드 제외)
+        const requiredKeywordsWords = requiredKeywords || [];
+        const otherKeywords = keywordsText.split(", ").filter(k => {
+          // 필수 키워드의 핵심 단어가 포함되지 않은 것만
+          return !requiredKeywordsWords.some(rk => {
+            const rkWord = rk.trim();
+            return k.includes(rkWord) || k.includes(rkWord.split(/[이가을를에에서]/)[0]);
+          });
+        });
+        if (otherKeywords.length > 0) {
+          keywordsSection += `\n- 추가 키워드 (자연스럽게 포함 권장): ${otherKeywords.join(", ")}`;
+        }
+      }
+    } else if (keywordsText) {
+      keywordsSection = `- 포함할 키워드 (각 리뷰에 자연스럽게 1회씩 포함): ${keywordsText}`;
+    }
+    
     const prompt = `네이버 영수증 리뷰 3개를 작성해줘.
 
 [필수 조건]
 - 매장명: ${storeName}
 - 주문: ${menuText}
 ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
-${keywordsList.length > 0 ? `- 포함할 키워드 (각 리뷰에 자연스럽게 1회씩 반드시 포함): ${keywordsText}` : ""}
-- **중요**: 위 키워드들을 각 리뷰에 최소 1회씩 자연스럽게 포함해야 합니다
+${keywordsSection ? keywordsSection + "\n" : ""}
 
 [작성 규칙 - 절대 위반 금지]
 1. 길이: 각 리뷰 230~320자
@@ -159,10 +193,12 @@ ${forbiddenPhrases.map(p => `   - "${p}"`).join('\n')}
    2) 감정 후기형: 약간의 감정 표현 포함
    3) 디테일 묘사형: 구체적인 묘사와 경험
 
-5. 필수 키워드 포함 (절대 필수): 다음 키워드들은 반드시 각 리뷰에 100% 포함되어야 합니다
-${requiredKeywords && requiredKeywords.length > 0 ? `   - 필수 키워드: ${requiredKeywords.join(", ")}` : ""}
-   - 위 필수 키워드들은 각 리뷰마다 반드시 자연스럽게 포함해야 합니다
+5. 필수 키워드 포함 (절대 필수):
+${requiredKeywordsText ? `   - 필수 키워드는 위 [필수 조건]에 명시된 "필수 키워드"를 의미합니다` : ""}
+${requiredKeywords && requiredKeywords.length > 0 ? `   - 필수 키워드 목록 (원본): ${requiredKeywords.join(", ")}` : ""}
+   - 위 필수 키워드들은 각 리뷰마다 반드시 100% 자연스럽게 포함해야 합니다
    - 키워드를 나열하지 말고 문장 속에 자연스럽게 녹여야 합니다
+   - 필수 키워드가 하나라도 누락되면 안 됩니다
 
 ${attempt > 0 ? `[중요] 이전 결과에서 키워드 포함 부족, 비문, 또는 반복이 발견되었습니다. 위 규칙을 더욱 엄격히 준수하세요. 특히 키워드를 반드시 포함하세요.` : ""}
 

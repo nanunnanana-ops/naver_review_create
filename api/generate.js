@@ -348,12 +348,17 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
     if (requiredKeywords && requiredKeywords.length > 0) {
       const missingRequired = [];
       
+      console.log(`[검증] 리뷰 ${index + 1} 필수 키워드 체크 시작`);
+      console.log(`[검증] 체크할 필수 키워드:`, requiredKeywords);
+      
       requiredKeywords.forEach((keyword) => {
         const keywordTrimmed = String(keyword).trim();
         if (keywordTrimmed) {
           // 대소문자 구분 없이, 부분 일치로 체크
           const regex = new RegExp(keywordTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
-          if (!regex.test(review)) {
+          const found = regex.test(review);
+          console.log(`[검증] 키워드 "${keywordTrimmed}" 검색: ${found ? "찾음" : "누락"} (리뷰: "${review.substring(0, 50)}...")`);
+          if (!found) {
             missingRequired.push(keywordTrimmed);
           }
         }
@@ -361,7 +366,10 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
 
       // 필수 키워드가 하나라도 누락되면 실패
       if (missingRequired.length > 0) {
+        console.error(`[검증 실패] 리뷰 ${index + 1}에 필수 키워드 누락:`, missingRequired);
         errors.push(`리뷰 ${index + 1}에 필수 키워드 누락 (${missingRequired.join(", ")})`);
+      } else {
+        console.log(`[검증 성공] 리뷰 ${index + 1}에 모든 필수 키워드 포함됨`);
       }
     }
 

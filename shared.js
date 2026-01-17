@@ -8,6 +8,9 @@
  * - DEMO_MODE: true면 서버 없이 로컬에서 리뷰 생성
  */
 
+// 즉시 실행: shared.js가 로드되었는지 확인
+console.log('🔵 shared.js 파일 로드됨 - 타임스탬프:', new Date().toISOString());
+
 // ========== 커스텀 설정 ==========
 const ADMIN_PIN = '2222';
 const CONFIG_SOURCE = 'local'; // 'local' 또는 'remote'
@@ -53,6 +56,7 @@ async function loadConfig() {
 }
 
 function loadConfigFromLocal() {
+  console.log('🔵 loadConfigFromLocal() 함수 호출됨');
   try {
     const saved = localStorage.getItem('reviewGeneratorConfig');
     console.log('=== loadConfigFromLocal 호출 ===');

@@ -195,7 +195,8 @@ function buildNaturalKeywordInsertions(keywords) {
   const sentences = [];
 
   if (locations.length > 0) {
-    sentences.push(buildNaturalLocationSentence(locations));
+    const locationSentences = buildNaturalLocationSentences(locations);
+    sentences.push(...locationSentences);
   }
 
   others.forEach((kw) => {
@@ -205,9 +206,10 @@ function buildNaturalKeywordInsertions(keywords) {
   return sentences.filter(Boolean);
 }
 
-function buildNaturalLocationSentence(locations) {
+function buildNaturalLocationSentences(locations) {
   const uniqLocations = Array.from(new Set(locations));
   const parts = shuffleArray(uniqLocations).slice(0, 3);
+  const results = [];
 
   if (parts.length === 1) {
     const templates = [
@@ -216,7 +218,7 @@ function buildNaturalLocationSentence(locations) {
       `${parts[0]} 쪽이라 이동이 수월했어요.`,
       `${parts[0]} 주변이라 자연스럽게 들렀어요.`,
     ];
-    return pickRandom(templates);
+    return [pickRandom(templates)];
   }
 
   if (parts.length === 2) {
@@ -227,17 +229,24 @@ function buildNaturalLocationSentence(locations) {
       `${a} 근처 들렀다가 ${b} 쪽으로 이동하면서 들렀어요.`,
       `${a} 방문 겸 ${b} 주변에서 식사했어요.`,
     ];
-    return pickRandom(templates);
+    return [pickRandom(templates)];
   }
 
   const [a, b, c] = parts;
-  const templates = [
-    `${a} 볼일 보고 ${b} 쪽으로 지나가다가 ${c} 근처에서 들렀어요.`,
-    `${a} 근처에 들렀다가 ${b} 인근을 지나며 ${c} 쪽에서 식사했어요.`,
-    `${a} 갔다가 ${b} 방향으로 이동하던 중 ${c} 근처에서 들렀어요.`,
-    `${a} 일정 보고 ${b} 쪽으로 이동하다가 ${c} 주변에서 한 끼 했어요.`,
+  // 3개 이상일 때는 2문장으로 분산
+  const templates1 = [
+    `${a} 볼일 보고 ${b} 쪽으로 이동했어요.`,
+    `${a} 들렀다가 ${b} 인근으로 넘어왔어요.`,
+    `${a} 근처에 갔다가 ${b} 쪽으로 이동했어요.`,
   ];
-  return pickRandom(templates);
+  const templates2 = [
+    `${c} 근처에서 식사했어요.`,
+    `${c} 주변에서 한 끼 했어요.`,
+    `${c} 쪽에서 들렀어요.`,
+  ];
+  results.push(pickRandom(templates1));
+  results.push(pickRandom(templates2));
+  return results;
 }
 
 function pickRandom(list) {

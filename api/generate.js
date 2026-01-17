@@ -40,10 +40,17 @@ export default async function handler(req, res) {
     const keywordsText = keywordsPhrases.join(", ");
     
     // 필수 키워드를 phrase로 변환 (프롬프트에 명확히 표시)
-    const requiredKeywordsArray = Array.isArray(requiredKeywords) ? requiredKeywords : (requiredKeywords ? [requiredKeywords] : []);
+    // 필수 키워드가 비어있으면 기본값으로 보정
+    const fallbackRequiredKeywords = ["서대문역", "국물", "강북삼성병원", "영천시장"];
+    const requiredKeywordsArray = Array.isArray(requiredKeywords)
+      ? requiredKeywords
+      : (requiredKeywords ? [requiredKeywords] : []);
+    const effectiveRequiredKeywords = requiredKeywordsArray.length > 0
+      ? requiredKeywordsArray
+      : fallbackRequiredKeywords;
     
-    const requiredKeywordsPhrases = requiredKeywordsArray.length > 0
-      ? convertKeywordsToPhrases(requiredKeywordsArray)
+    const requiredKeywordsPhrases = effectiveRequiredKeywords.length > 0
+      ? convertKeywordsToPhrases(effectiveRequiredKeywords)
       : [];
     const requiredKeywordsText = requiredKeywordsPhrases.join(", ");
     
@@ -57,11 +64,22 @@ export default async function handler(req, res) {
 
     if (groqKey) {
       // Groq API 사용 (OpenAI-compatible)
-      const requiredKeywordsPhrases = requiredKeywords && requiredKeywords.length > 0
-        ? convertKeywordsToPhrases(requiredKeywords)
+      const requiredKeywordsPhrases = effectiveRequiredKeywords && effectiveRequiredKeywords.length > 0
+        ? convertKeywordsToPhrases(effectiveRequiredKeywords)
         : [];
       const requiredKeywordsText = requiredKeywordsPhrases.join(", ");
-      reviews = await generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords || [], requiredKeywordsText, storeName, targetLength, groqKey);
+      reviews = await generateWithGroq(
+        menuText,
+        sideText,
+        keywordsText,
+        keywordsPhrases,
+        originalKeywords,
+        effectiveRequiredKeywords,
+        requiredKeywordsText,
+        storeName,
+        targetLength,
+        groqKey
+      );
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn("API 키가 없어 템플릿 기반 생성 사용");
@@ -76,11 +94,6 @@ export default async function handler(req, res) {
       reviews = generateFallbackReviews(menuText, sideText, kb, storeName);
     }
 
-    // 필수 키워드가 누락된 경우 보정 (최소한의 문장 추가)
-    if (requiredKeywordsArray.length > 0) {
-      reviews = ensureRequiredKeywords(reviews, requiredKeywordsArray);
-    }
-
     // 길이 검증만 수행 (후처리로 늘리지 않음)
     reviews = reviews.map((review, index) => {
       const length = review.length;
@@ -92,6 +105,11 @@ export default async function handler(req, res) {
       // 200자 미만이어도 후처리로 늘리지 않음 (API가 생성한 그대로 사용)
       return review;
     });
+
+    // 필수 키워드가 누락된 경우 보정 (최소한의 문장 추가)
+    if (effectiveRequiredKeywords.length > 0) {
+      reviews = ensureRequiredKeywords(reviews, effectiveRequiredKeywords);
+    }
 
     return res.status(200).json({ reviews });
   } catch (error) {
@@ -118,17 +136,22 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
 
     if (missing.length === 0) return updated;
 
-    // 최소 문장으로 보정
-    missing.forEach((kw) => {
-      const keyword = String(kw).trim();
-      if (!keyword) return;
-      const sentence = ` ${keyword} 관련해서도 만족했어요.`;
-      updated += sentence;
-    });
+    // 누락 키워드를 문장으로 추가 (길이 초과 방지)
+    const appendSentences = missing
+      .map((kw) => ` ${String(kw).trim()} 관련해서도 만족했어요.`)
+      .join("");
 
-    // 400자 초과 시 자르기
-    if (updated.length > 400) {
-      updated = updated.substring(0, 397) + "...";
+    // 400자를 넘지 않도록 본문을 줄이고 추가 문장을 붙임
+    const maxLength = 400;
+    const allowedBaseLength = Math.max(0, maxLength - appendSentences.length);
+    if (updated.length > allowedBaseLength) {
+      updated = updated.substring(0, allowedBaseLength).trim();
+    }
+    updated = `${updated}${appendSentences}`;
+
+    // 여전히 길면 마지막 정리
+    if (updated.length > maxLength) {
+      updated = updated.substring(0, maxLength);
     }
 
     return updated;

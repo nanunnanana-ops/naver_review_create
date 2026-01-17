@@ -30,9 +30,17 @@ export default async function handler(req, res) {
     const menuText = menus.length === 1 ? menus[0] : menus.join("과 ");
     const sideText = sides && sides.length > 0 ? sides.join(", ") : "";
     
+    // 필수 키워드와 선택 키워드 분리 (app.js에서 requiredKeywords가 앞에 오므로)
+    // keywordsBundle 구조: [requiredKeywords..., selectedMenus..., promoKeywords...]
+    // 클라이언트에서 requiredKeywords 개수를 보내주는 게 이상적이지만, 
+    // 일단 keywordsBundle 전체를 사용하되 검증에서 강화
+    
     // 키워드를 자연어 phrase로 변환
     const keywordsPhrases = convertKeywordsToPhrases(keywordsBundle || []);
     const keywordsText = keywordsPhrases.join(", ");
+    
+    // 원본 키워드 목록 (검증용 - phrase 변환 전)
+    const originalKeywords = keywordsBundle || [];
 
     // API 선택: GROQ_API_KEY가 있으면 Groq, 없으면 템플릿 폴백
     const groqKey = process.env.GROQ_API_KEY;
@@ -41,7 +49,7 @@ export default async function handler(req, res) {
 
     if (groqKey) {
       // Groq API 사용 (OpenAI-compatible)
-      reviews = await generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, storeName, targetLength, groqKey);
+      reviews = await generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, storeName, targetLength, groqKey);
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn("API 키가 없어 템플릿 기반 생성 사용");
@@ -105,13 +113,13 @@ function convertKeywordsToPhrases(keywordsBundle) {
 }
 
 // ========== Groq API (OpenAI-compatible) ==========
-async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, storeName, targetLength, apiKey) {
+async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, storeName, targetLength, apiKey) {
   const keywordsList = keywordsPhrases || (keywordsText ? keywordsText.split(", ").filter((k) => k.trim()) : []);
   
   // 검증 및 재시도 로직
   let reviews = null;
   let temperature = 0.8;
-  const maxRetries = 3; // 비문 재생성 포함해서 3회
+  const maxRetries = 4; // 비문/키워드 검증 포함해서 4회로 증가
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     // 반복 금지 문구 리스트
@@ -131,7 +139,8 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
 - 매장명: ${storeName}
 - 주문: ${menuText}
 ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
-${keywordsList.length > 0 ? `- 키워드 활용 예시 (이런 식으로 자연스럽게 사용): ${keywordsText}` : ""}
+${keywordsList.length > 0 ? `- 포함할 키워드 (각 리뷰에 자연스럽게 1회씩 반드시 포함): ${keywordsText}` : ""}
+- **중요**: 위 키워드들을 각 리뷰에 최소 1회씩 자연스럽게 포함해야 합니다
 
 [작성 규칙 - 절대 위반 금지]
 1. 길이: 각 리뷰 230~320자
@@ -150,9 +159,11 @@ ${forbiddenPhrases.map(p => `   - "${p}"`).join('\n')}
    2) 감정 후기형: 약간의 감정 표현 포함
    3) 디테일 묘사형: 구체적인 묘사와 경험
 
-5. 키워드는 각 리뷰에 자연스럽게 1회씩만 포함
+5. 키워드 포함 (최우선): 위에 나열한 키워드들을 반드시 각 리뷰에 자연스럽게 포함해야 합니다
+   - 키워드를 나열하지 말고 문장 속에 자연스럽게 녹여야 합니다
+   - 각 리뷰마다 최소 3개 이상의 키워드가 포함되어야 합니다
 
-${attempt > 0 ? `[중요] 이전 결과에서 비문이나 반복이 발견되었습니다. 위 규칙을 더욱 엄격히 준수하세요.` : ""}
+${attempt > 0 ? `[중요] 이전 결과에서 키워드 포함 부족, 비문, 또는 반복이 발견되었습니다. 위 규칙을 더욱 엄격히 준수하세요. 특히 키워드를 반드시 포함하세요.` : ""}
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)
@@ -221,7 +232,7 @@ JSON 배열만 출력 (설명 없이)
       }
 
       // 검증
-      const validation = validateReviews(extractedReviews, keywordsList);
+      const validation = validateReviews(extractedReviews, keywordsList, originalKeywords);
       
       // 비문 패턴 체크
       const hasGrammaticalError = checkGrammaticalErrors(extractedReviews);
@@ -260,7 +271,7 @@ JSON 배열만 출력 (설명 없이)
 }
 
 // 검증 함수
-function validateReviews(reviews, keywordsList) {
+function validateReviews(reviews, keywordsList, originalKeywords = []) {
   const errors = [];
 
   // 배열 3개인지 확인
@@ -283,26 +294,31 @@ function validateReviews(reviews, keywordsList) {
       errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 목표: 230~320자, 허용: 200~400자)`);
     }
 
-    // 키워드 검증 (각 키워드가 1회만 포함되어야 함)
-    keywordsList.forEach((keyword) => {
-      const keywordTrimmed = keyword.trim();
+    // 키워드 검증 강화: 원본 키워드 목록으로 체크
+    let keywordFoundCount = 0;
+    const missingKeywords = [];
+    
+    originalKeywords.forEach((keyword) => {
+      const keywordTrimmed = String(keyword).trim();
       if (keywordTrimmed) {
-        // 키워드 phrase에서 핵심 단어 추출 (예: "국물이 진했어요" → "국물")
-        const coreKeyword = keywordTrimmed.split(/[이가을를에에서]/)[0].trim();
-        if (coreKeyword) {
-          const regex = new RegExp(coreKeyword, "g");
-          const matches = review.match(regex);
-          const count = matches ? matches.length : 0;
-
-          if (count === 0) {
-            errors.push(`리뷰 ${index + 1}에 키워드 "${coreKeyword}" 없음`);
-          } else if (count > 2) {
-            // phrase 형태로 변환했으므로 1-2회 정도는 허용
-            errors.push(`리뷰 ${index + 1}에 키워드 "${coreKeyword}" ${count}회 포함 (과도함)`);
-          }
+        // 대소문자 구분 없이, 부분 일치로 체크 (더 관대하게)
+        const regex = new RegExp(keywordTrimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+        if (regex.test(review)) {
+          keywordFoundCount++;
+        } else {
+          missingKeywords.push(keywordTrimmed);
         }
       }
     });
+
+    // 각 리뷰에는 최소한 키워드의 30% 이상이 포함되어야 함
+    const minRequired = Math.ceil(originalKeywords.length * 0.3);
+    if (keywordFoundCount < minRequired && originalKeywords.length > 0) {
+      errors.push(`리뷰 ${index + 1}에 키워드 포함 부족 (${keywordFoundCount}/${originalKeywords.length}개, 최소 ${minRequired}개 필요)`);
+      if (missingKeywords.length > 0) {
+        errors.push(`  - 누락된 키워드: ${missingKeywords.slice(0, 3).join(", ")}${missingKeywords.length > 3 ? "..." : ""}`);
+      }
+    }
   });
 
   return {

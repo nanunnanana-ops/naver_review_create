@@ -138,7 +138,8 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
 
     // 누락 키워드를 자연스러운 문장으로 분산 삽입
     const sentences = updated.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean);
-    const insertions = missing.map((kw) => buildNaturalKeywordSentence(String(kw).trim()));
+    const missingKeywords = missing.map((kw) => String(kw).trim()).filter(Boolean);
+    const insertions = buildNaturalKeywordInsertions(missingKeywords);
     const maxLength = 400;
 
     insertions.forEach((sentence, idx) => {
@@ -180,6 +181,44 @@ function buildNaturalKeywordSentence(keyword) {
     `${keyword}이(가) 자연스럽게 느껴졌어요.`,
   ];
   return templates[Math.floor(Math.random() * templates.length)];
+}
+
+function buildNaturalKeywordInsertions(keywords) {
+  if (!keywords || keywords.length === 0) return [];
+
+  const locationHints = ["역", "병원", "시장", "터미널", "공원", "학교", "사거리", "거리", "동", "구", "로", "길"];
+  const isLocationKeyword = (kw) => locationHints.some((hint) => kw.includes(hint));
+
+  const locations = keywords.filter(isLocationKeyword);
+  const others = keywords.filter((kw) => !isLocationKeyword(kw));
+
+  const sentences = [];
+
+  if (locations.length > 0) {
+    sentences.push(buildNaturalLocationSentence(locations));
+  }
+
+  others.forEach((kw) => {
+    sentences.push(buildNaturalKeywordSentence(kw));
+  });
+
+  return sentences.filter(Boolean);
+}
+
+function buildNaturalLocationSentence(locations) {
+  const uniqLocations = Array.from(new Set(locations));
+  const parts = uniqLocations.slice(0, 3);
+
+  if (parts.length === 1) {
+    return `${parts[0]} 근처라 들르기 편했어요.`;
+  }
+
+  if (parts.length === 2) {
+    return `${parts[0]} 들렀다가 ${parts[1]} 근처에서 식사했어요.`;
+  }
+
+  // 3개 이상일 때는 자연스러운 동선 문장으로 묶기
+  return `${parts[0]} 볼일 보고 ${parts[1]} 쪽으로 지나가다가 ${parts[2]} 근처에서 들렀어요.`;
 }
 
 // ========== 키워드를 자연어 phrase로 변환 ==========
@@ -268,8 +307,8 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
 - 비문 금지: "국물했어요", "어국수했어요" 같은 패턴 절대 사용 금지
 - 반복 금지: "다음에도 방문할 예정입니다", "가격 대비 만족스러웠어요" 같은 문구 사용 금지
 - 3개 리뷰는 서로 다른 톤 (담백/감정/디테일)
-- 지역/장소 키워드(예: 역/병원/시장)는 "근처/인근/쪽" 표현으로 자연스럽게 문장 속에 섞기
-- 키워드는 한 문장에 몰아넣지 말고 서로 다른 문장에 분산
+- 지역/장소 키워드는 동선 문장으로 자연스럽게 포함 (예: "강북삼성병원 들렀다가 서대문역 근처에서 식사했어요")
+- 지역/장소 키워드끼리는 한 문장에 묶어도 좋음 (동선/이동 맥락)
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)

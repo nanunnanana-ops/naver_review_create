@@ -63,7 +63,26 @@ function loadConfigFromLocal() {
       console.log('파싱된 필수 키워드:', parsed.requiredKeywords);
       console.log('파싱된 필수 키워드 타입:', typeof parsed.requiredKeywords, Array.isArray(parsed.requiredKeywords));
       
-      const merged = { ...DEFAULT_CONFIG, ...parsed };
+      // parsed 값이 있으면 그대로 사용 (병합하지 않음 - 저장된 값이 우선)
+      // 단, 배열 필드는 안전하게 처리
+      const merged = {
+        ...DEFAULT_CONFIG,
+        ...parsed,
+        // 배열 필드는 명시적으로 저장된 값 사용 (없으면 기본값)
+        requiredKeywords: Array.isArray(parsed.requiredKeywords) && parsed.requiredKeywords.length > 0
+          ? parsed.requiredKeywords
+          : (parsed.requiredKeywords || DEFAULT_CONFIG.requiredKeywords),
+        promoKeywordsPool: Array.isArray(parsed.promoKeywordsPool) && parsed.promoKeywordsPool.length > 0
+          ? parsed.promoKeywordsPool
+          : (parsed.promoKeywordsPool || DEFAULT_CONFIG.promoKeywordsPool),
+        menus: Array.isArray(parsed.menus) && parsed.menus.length > 0
+          ? parsed.menus
+          : (parsed.menus || DEFAULT_CONFIG.menus),
+        sides: Array.isArray(parsed.sides) && parsed.sides.length > 0
+          ? parsed.sides
+          : (parsed.sides || DEFAULT_CONFIG.sides),
+      };
+      
       console.log('병합된 설정:', merged);
       console.log('병합된 필수 키워드:', merged.requiredKeywords);
       console.log('병합된 필수 키워드 개수:', merged.requiredKeywords ? merged.requiredKeywords.length : 0);

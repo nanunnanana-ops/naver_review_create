@@ -22,6 +22,13 @@ export default async function handler(req, res) {
   try {
     const { storeName, menus, sides, keywordsBundle, requiredKeywords, targetLength, nonce } = req.body;
 
+    // 디버깅: 받은 데이터 확인
+    console.log('=== API 요청 받음 ===');
+    console.log('requiredKeywords (원본):', requiredKeywords);
+    console.log('requiredKeywords 타입:', typeof requiredKeywords, Array.isArray(requiredKeywords));
+    console.log('requiredKeywords 개수:', requiredKeywords ? requiredKeywords.length : 0);
+    console.log('keywordsBundle:', keywordsBundle);
+
     if (!menus || menus.length === 0) {
       return res.status(400).json({ error: "메뉴가 필요합니다" });
     }
@@ -40,10 +47,16 @@ export default async function handler(req, res) {
     const keywordsText = keywordsPhrases.join(", ");
     
     // 필수 키워드를 phrase로 변환 (프롬프트에 명확히 표시)
-    const requiredKeywordsPhrases = requiredKeywords && requiredKeywords.length > 0
-      ? convertKeywordsToPhrases(requiredKeywords)
+    const requiredKeywordsArray = Array.isArray(requiredKeywords) ? requiredKeywords : (requiredKeywords ? [requiredKeywords] : []);
+    console.log('필수 키워드 배열 (확인):', requiredKeywordsArray);
+    
+    const requiredKeywordsPhrases = requiredKeywordsArray.length > 0
+      ? convertKeywordsToPhrases(requiredKeywordsArray)
       : [];
     const requiredKeywordsText = requiredKeywordsPhrases.join(", ");
+    
+    console.log('필수 키워드 phrase 변환 결과:', requiredKeywordsPhrases);
+    console.log('필수 키워드 phrase 텍스트:', requiredKeywordsText);
     
     // 원본 키워드 목록 (검증용 - phrase 변환 전)
     const originalKeywords = keywordsBundle || [];

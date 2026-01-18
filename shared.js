@@ -30,8 +30,9 @@ const DEFAULT_CONFIG = {
 
 // ========== 설정 로드 ==========
 async function loadConfig() {
-  // 하드코딩된 DEFAULT_CONFIG를 항상 사용 (localStorage 무시)
-  return DEFAULT_CONFIG;
+  // 관리자에서 저장한 localStorage 설정을 우선 사용
+  const localConfig = loadConfigFromLocal();
+  return localConfig || DEFAULT_CONFIG;
   
   // 아래 코드는 사용하지 않음 (주석 처리)
   /*
@@ -66,7 +67,7 @@ function loadConfigFromLocal() {
       console.log('파싱된 필수 키워드:', parsed.requiredKeywords);
       console.log('파싱된 필수 키워드 타입:', typeof parsed.requiredKeywords, Array.isArray(parsed.requiredKeywords));
       
-      // 저장된 값이 우선하도록 단순화: 배열 필드는 parsed에서 가져오고, 유효하지 않으면 기본값 사용
+      // 저장된 값이 우선: 배열 필드는 유효한 배열일 때만 사용
       const merged = {
         ...DEFAULT_CONFIG, // 기본값 먼저 설정
         ...parsed, // 저장된 값으로 덮어쓰기

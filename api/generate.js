@@ -524,7 +524,6 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
     const length = review.length;
 
     // 길이 검증 (80~200자 범위)
-    const length = review.length;
     if (length < 80 || length > 200) {
       errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 허용: 80~200자)`);
     }

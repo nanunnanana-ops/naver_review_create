@@ -359,7 +359,8 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
 
 문체는 정리체(“전반적으로”, “재방문 의사”)를 피하고, 사람 후기 말투로 작성해라.
 
-길이는 6~9문장. 마지막은 딱딱한 결론 대신 “다음에 또 올 듯/추천”처럼 자연스럽게 마무리.
+길이는 80~200자 랜덤. 문장은 완벽하게 끝나지 않아도 되고, 존댓말이 아니어도 됨.
+“~함/~임” 말투도 포함해 다양하게 써라.
 
 서로 다른 장소 키워드가 2개 이상 있을 때, 두 장소를 한 문장에 함께 넣지 마라.
 장소 키워드는 “동선”이 아니라 “그 지역에서 떠오르는/근처”처럼 독립적으로만 언급하라.
@@ -380,7 +381,7 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
 ${keywordsSection ? keywordsSection + "\n" : ""}
 
 [작성 규칙]
-1. 문장 수: 각 리뷰 6~9문장
+1. 길이: 각 리뷰 80~200자 (완전한 문장일 필요 없음)
 2. 비문 절대 금지: "국물했어요", "어국수했어요" 같은 패턴
 3. 반복 금지: ${forbiddenPhrases.slice(0, 3).join(", ")} 같은 문구 사용 금지
 4. 3개 리뷰는 서로 다른 톤
@@ -517,10 +518,10 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
 
     const length = review.length;
 
-    // 문장 수 검증 (6~9문장)
-    const sentenceCount = countSentences(review);
-    if (sentenceCount < 6 || sentenceCount > 9) {
-      errors.push(`리뷰 ${index + 1} 문장 수가 범위를 벗어남 (현재: ${sentenceCount}문장, 허용: 6~9문장)`);
+    // 길이 검증 (80~200자 범위)
+    const length = review.length;
+    if (length < 80 || length > 200) {
+      errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 허용: 80~200자)`);
     }
 
     // 장소 키워드가 한 문장에 2개 이상 들어가는지 확인

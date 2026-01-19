@@ -173,6 +173,7 @@ async function handleGenerate() {
       }
     } else {
       // 서버 모드: API 호출
+      const targetLength = Math.floor(Math.random() * 121) + 80; // 80~200
       const requestBody = {
         storeName: config.storeName,
         menus: selectedMenus,
@@ -180,7 +181,7 @@ async function handleGenerate() {
         keywordsBundle: keywordsBundle,
         requiredKeywords: config.requiredKeywords || [], // 필수 키워드 별도 전송
         promoKeywordsPool: config.promoKeywordsPool || [],
-        targetLength: 260, // 150~380글자 내외
+        targetLength: targetLength, // 80~200 랜덤
         nonce: nonce
       };
       

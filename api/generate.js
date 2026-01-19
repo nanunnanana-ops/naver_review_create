@@ -97,12 +97,12 @@ export default async function handler(req, res) {
     // 길이 검증만 수행 (후처리로 늘리지 않음)
     reviews = reviews.map((review, index) => {
       const length = review.length;
-      // 400자 초과 시에만 자르기
-      if (length > 400) {
+      // 380자 초과 시에만 자르기
+      if (length > 380) {
         console.warn(`리뷰 ${index + 1}이 너무 김 (${length}자), 자름`);
-        return review.substring(0, 397) + "...";
+        return review.substring(0, 377) + "...";
       }
-      // 200자 미만이어도 후처리로 늘리지 않음 (API가 생성한 그대로 사용)
+      // 150자 미만이어도 후처리로 늘리지 않음 (API가 생성한 그대로 사용)
       return review;
     });
 
@@ -137,10 +137,10 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
     if (missing.length === 0) return updated;
 
     // 누락 키워드를 자연스러운 문장으로 분산 삽입
-    const sentences = updated.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean);
+    let sentences = updated.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean);
     const missingKeywords = missing.map((kw) => String(kw).trim()).filter(Boolean);
     const insertions = buildNaturalKeywordInsertions(missingKeywords);
-    const maxLength = 400;
+    const maxLength = 380;
 
     insertions.forEach((sentence, idx) => {
       const targetIndex = Math.min(
@@ -150,6 +150,12 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
       sentences.splice(targetIndex, 0, sentence);
     });
 
+    // 문장 수를 3으로 맞춤 (초과 시 병합)
+    while (sentences.length > 3) {
+      const last = sentences.pop();
+      sentences[sentences.length - 1] = `${sentences[sentences.length - 1]} ${last}`.replace(/\s+/g, " ").trim();
+    }
+
     updated = sentences.join(" ").replace(/\s+/g, " ").trim();
     if (updated.length > maxLength) {
       updated = updated.substring(0, maxLength).trim();
@@ -157,6 +163,11 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
 
     return updated;
   });
+}
+
+function countSentences(text) {
+  if (!text) return 0;
+  return text.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean).length;
 }
 
 function buildNaturalKeywordSentence(keyword) {
@@ -344,7 +355,8 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
   → 위 필수 키워드들을 각 리뷰에 자연스럽게 모두 포함해야 합니다. 하나라도 빠지면 안 됩니다.
 
 [기타 요구사항]
-- 각 리뷰 230~320자
+- 각 리뷰 150~380자
+- 각 리뷰는 3문장으로 작성
 - 비문 금지: "국물했어요", "어국수했어요" 같은 패턴 절대 사용 금지
 - 반복 금지: "다음에도 방문할 예정입니다", "가격 대비 만족스러웠어요" 같은 문구 사용 금지
 - 3개 리뷰는 서로 다른 톤 (담백/감정/디테일)
@@ -363,7 +375,7 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
 ${keywordsSection ? keywordsSection + "\n" : ""}
 
 [작성 규칙]
-1. 길이: 각 리뷰 230~320자
+1. 길이: 각 리뷰 150~380자 (3문장)
 2. 비문 절대 금지: "국물했어요", "어국수했어요" 같은 패턴
 3. 반복 금지: ${forbiddenPhrases.slice(0, 3).join(", ")} 같은 문구 사용 금지
 4. 3개 리뷰는 서로 다른 톤
@@ -492,9 +504,14 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
 
     const length = review.length;
 
-    // 길이 검증 (230~320자 목표, 200~400 허용 범위)
-    if (length < 200 || length > 400) {
-      errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 목표: 230~320자, 허용: 200~400자)`);
+    // 길이 검증 (150~380자 범위)
+    if (length < 150 || length > 380) {
+      errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 허용: 150~380자)`);
+    }
+
+    // 문장 수 검증 (3문장)
+    if (countSentences(review) !== 3) {
+      errors.push(`리뷰 ${index + 1} 문장 수가 3이 아님 (현재: ${countSentences(review)}문장)`);
     }
 
     // 필수 키워드 검증: 100% 포함 필수

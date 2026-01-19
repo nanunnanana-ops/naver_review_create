@@ -149,7 +149,7 @@ async function handleGenerate() {
         sides: selectedSides,
         keywordsBundle: keywordsBundle,
         requiredKeywords: config.requiredKeywords || [], // 필수 키워드 별도 전송
-        targetLength: 300, // 200~400글자 내외
+        targetLength: 260, // 150~380글자 내외
         nonce: nonce
       };
       

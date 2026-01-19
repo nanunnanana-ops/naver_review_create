@@ -107,6 +107,7 @@ export default async function handler(req, res) {
     if (effectiveRequiredKeywords.length > 0) {
       reviews = ensureRequiredKeywords(reviews, effectiveRequiredKeywords);
     }
+    reviews = ensureCompleteSentences(reviews);
 
     return res.status(200).json({ reviews });
   } catch (error) {
@@ -174,6 +175,22 @@ function splitSentences(text) {
 function isLocationKeyword(keyword) {
   const locationHints = ["역", "병원", "시장", "터미널", "공원", "학교", "사거리", "거리", "동", "구", "로", "길"];
   return locationHints.some((hint) => String(keyword).includes(hint));
+}
+
+function ensureCompleteSentences(reviews) {
+  if (!Array.isArray(reviews)) return reviews;
+  return reviews.map((review) => {
+    if (typeof review !== "string") return review;
+    let text = review.trim();
+    // 말줄임표 제거
+    text = text.replace(/\.{2,}|…/g, ".");
+
+    // 문장 끝이 완결이 아니면 마무리
+    if (!/[.!?]$/.test(text)) {
+      text = `${text}요.`;
+    }
+    return text.replace(/\s+\./g, ".").trim();
+  });
 }
 
 
@@ -365,8 +382,8 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
 
 문체는 정리체(“전반적으로”, “재방문 의사”)를 피하고, 사람 후기 말투로 작성해라.
 
-길이는 80~200자 랜덤. 문장은 완벽하게 끝나지 않아도 되고, 존댓말이 아니어도 됨.
-“~함/~임” 말투도 포함해 다양하게 써라.
+길이는 80~200자 랜덤. 문장은 반드시 완결되게 써라(말줄임표/생략체 금지).
+자연스러운 일상 후기 말투로 작성하라.
 
 서로 다른 장소 키워드가 2개 이상 있을 때, 두 장소를 한 문장에 함께 넣지 마라.
 장소 키워드는 “동선”이 아니라 “그 지역에서 떠오르는/근처”처럼 독립적으로만 언급하라.
@@ -391,6 +408,9 @@ ${keywordsSection ? keywordsSection + "\n" : ""}
 2. 비문 절대 금지: "국물했어요", "어국수했어요" 같은 패턴
 3. 반복 금지: ${forbiddenPhrases.slice(0, 3).join(", ")} 같은 문구 사용 금지
 4. 2개 리뷰는 서로 다른 톤
+
+문장 규칙:
+- 모든 문장은 완결되게 작성 (말줄임표/생략체 금지)
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)

@@ -134,7 +134,7 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
     if (missing.length === 0) return updated;
 
     // 누락 키워드를 자연스러운 문장으로 분산 삽입
-    let sentences = updated.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean);
+    let sentences = splitSentences(updated);
     const missingKeywords = missing.map((kw) => String(kw).trim()).filter(Boolean);
     const insertions = buildNaturalKeywordInsertions(missingKeywords);
     const maxLength = 380;
@@ -168,7 +168,7 @@ function countSentences(text) {
 }
 
 function splitSentences(text) {
-  return text.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean);
+  return text.split(/(?:[.!?]|다\.)\s+/).filter(Boolean);
 }
 
 function isLocationKeyword(keyword) {

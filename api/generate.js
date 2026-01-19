@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { storeName, menus, sides, keywordsBundle, requiredKeywords, targetLength, nonce } = req.body;
+    const { storeName, menus, sides, keywordsBundle, requiredKeywords, promoKeywordsPool, targetLength, nonce } = req.body;
 
     if (!menus || menus.length === 0) {
       return res.status(400).json({ error: "메뉴가 필요합니다" });
@@ -57,6 +57,9 @@ export default async function handler(req, res) {
     // 원본 키워드 목록 (검증용 - phrase 변환 전)
     const originalKeywords = keywordsBundle || [];
 
+    // 프로모션 키워드 풀 (LLM이 1~3개 선택)
+    const promoPool = Array.isArray(promoKeywordsPool) ? promoKeywordsPool : [];
+
     // API 선택: GROQ_API_KEY가 있으면 Groq, 없으면 템플릿 폴백
     const groqKey = process.env.GROQ_API_KEY;
 
@@ -76,6 +79,7 @@ export default async function handler(req, res) {
         originalKeywords,
         effectiveRequiredKeywords,
         requiredKeywordsText,
+        promoPool,
         storeName,
         targetLength,
         groqKey
@@ -93,18 +97,6 @@ export default async function handler(req, res) {
       const kb = keywordsBundle || [];
       reviews = generateFallbackReviews(menuText, sideText, kb, storeName);
     }
-
-    // 길이 검증만 수행 (후처리로 늘리지 않음)
-    reviews = reviews.map((review, index) => {
-      const length = review.length;
-      // 380자 초과 시에만 자르기
-      if (length > 380) {
-        console.warn(`리뷰 ${index + 1}이 너무 김 (${length}자), 자름`);
-        return review.substring(0, 377) + "...";
-      }
-      // 150자 미만이어도 후처리로 늘리지 않음 (API가 생성한 그대로 사용)
-      return review;
-    });
 
     // 필수 키워드가 누락된 경우 보정 (최소한의 문장 추가)
     if (effectiveRequiredKeywords.length > 0) {
@@ -167,7 +159,16 @@ function ensureRequiredKeywords(reviews, requiredKeywords) {
 
 function countSentences(text) {
   if (!text) return 0;
-  return text.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean).length;
+  return splitSentences(text).length;
+}
+
+function splitSentences(text) {
+  return text.split(/(?<=[.!?]|다\.)\s+/).filter(Boolean);
+}
+
+function isLocationKeyword(keyword) {
+  const locationHints = ["역", "병원", "시장", "터미널", "공원", "학교", "사거리", "거리", "동", "구", "로", "길"];
+  return locationHints.some((hint) => String(keyword).includes(hint));
 }
 
 function buildNaturalKeywordSentence(keyword) {
@@ -206,7 +207,7 @@ function buildNaturalKeywordInsertions(keywords) {
   const sentences = [];
 
   if (locations.length > 0) {
-    const locationSentences = buildNaturalLocationSentences(locations);
+    const locationSentences = buildIndependentLocationSentences(locations);
     sentences.push(...locationSentences);
   }
 
@@ -217,46 +218,21 @@ function buildNaturalKeywordInsertions(keywords) {
   return sentences.filter(Boolean);
 }
 
-function buildNaturalLocationSentences(locations) {
+function buildIndependentLocationSentences(locations) {
   const uniqLocations = Array.from(new Set(locations));
-  const parts = shuffleArray(uniqLocations).slice(0, 3);
   const results = [];
+  const shuffled = shuffleArray(uniqLocations);
 
-  if (parts.length === 1) {
+  shuffled.forEach((loc) => {
     const templates = [
-      `${parts[0]} 근처라 들르기 편했어요.`,
-      `${parts[0]} 인근이라 접근이 쉬웠어요.`,
-      `${parts[0]} 쪽이라 이동이 수월했어요.`,
-      `${parts[0]} 주변이라 자연스럽게 들렀어요.`,
+      `${loc} 근처라 들르기 편했어요.`,
+      `${loc} 인근이라 접근이 쉬웠어요.`,
+      `${loc} 주변이라 자연스럽게 들렀어요.`,
+      `${loc} 쪽이라 위치 설명하기 좋았어요.`,
     ];
-    return [pickRandom(templates)];
-  }
+    results.push(pickRandom(templates));
+  });
 
-  if (parts.length === 2) {
-    const [a, b] = parts;
-    const templates = [
-      `${a} 들렀다가 ${b} 근처에서 식사했어요.`,
-      `${a} 쪽에 볼일 보고 ${b} 인근에서 한 끼 했어요.`,
-      `${a} 근처 들렀다가 ${b} 쪽으로 이동하면서 들렀어요.`,
-      `${a} 방문 겸 ${b} 주변에서 식사했어요.`,
-    ];
-    return [pickRandom(templates)];
-  }
-
-  const [a, b, c] = parts;
-  // 3개 이상일 때는 2문장으로 분산
-  const templates1 = [
-    `${a} 볼일 보고 ${b} 쪽으로 이동했어요.`,
-    `${a} 들렀다가 ${b} 인근으로 넘어왔어요.`,
-    `${a} 근처에 갔다가 ${b} 쪽으로 이동했어요.`,
-  ];
-  const templates2 = [
-    `${c} 근처에서 식사했어요.`,
-    `${c} 주변에서 한 끼 했어요.`,
-    `${c} 쪽에서 들렀어요.`,
-  ];
-  results.push(pickRandom(templates1));
-  results.push(pickRandom(templates2));
   return results;
 }
 
@@ -298,7 +274,7 @@ function convertKeywordsToPhrases(keywordsBundle) {
 }
 
 // ========== Groq API (OpenAI-compatible) ==========
-async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords, requiredKeywordsText, storeName, targetLength, apiKey) {
+async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrases, originalKeywords, requiredKeywords, requiredKeywordsText, promoPool, storeName, targetLength, apiKey) {
   const keywordsList = keywordsPhrases || (keywordsText ? keywordsText.split(", ").filter((k) => k.trim()) : []);
   
   // 검증 및 재시도 로직
@@ -345,23 +321,52 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
     
     // 필수 키워드가 있을 때는 간소화된 프롬프트 (필수 키워드 우선)
     const prompt = requiredKeywords && requiredKeywords.length > 0
-      ? `네이버 영수증 리뷰 3개 작성.
+      ? `너는 실제 사람이 쓴 것 같은 “네이버 영수증 리뷰”를 생성하는 작가다.
+입력으로 (1) 손님이 고른 메뉴, (2) 사장님이 지정한 필수 키워드, (3) 랜덤 프로모션 키워드 후보가 주어진다.
+이 3가지를 활용해 자연스럽고 광고처럼 보이지 않는 후기를 작성하라.
 
-[최우선 필수 조건 - 반드시 지켜야 함]
-- 매장명: ${storeName}
-- 주문: ${menuText}
-${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
-- **필수 키워드 (각 리뷰에 반드시 100% 포함)**: ${requiredKeywordsText || requiredKeywords.join(", ")}
-  → 위 필수 키워드들을 각 리뷰에 자연스럽게 모두 포함해야 합니다. 하나라도 빠지면 안 됩니다.
+입력
 
-[기타 요구사항]
-- 각 리뷰 150~380자
-- 각 리뷰는 3문장으로 작성
-- 비문 금지: "국물했어요", "어국수했어요" 같은 패턴 절대 사용 금지
-- 반복 금지: "다음에도 방문할 예정입니다", "가격 대비 만족스러웠어요" 같은 문구 사용 금지
-- 3개 리뷰는 서로 다른 톤 (담백/감정/디테일)
-- 지역/장소 키워드는 동선 문장으로 자연스럽게 포함 (예: "강북삼성병원 들렀다가 서대문역 근처에서 식사했어요")
-- 지역/장소 키워드끼리는 한 문장에 묶어도 좋음 (동선/이동 맥락)
+방문상황/원문(있으면 참고): ${""}
+
+손님이 선택한 메뉴(반드시 언급): ${menuText}
+
+사장님 필수 키워드(반드시 포함): ${requiredKeywords.join(", ")}
+
+프로모션 키워드 풀(선택적으로 1~3개만 사용): ${Array.isArray(promoPool) ? promoPool.join(", ") : ""}
+
+핵심 규칙(중요)
+
+필수 키워드는 반드시 포함하되, 한 문장에 키워드가 2개 이상 몰리지 않게 분산해라.
+
+키워드끼리는 관련이 없을 수 있다. 따라서
+
+“A 갔다가 B 갔다가”
+
+“A 근처라서 B에서 먹었다”
+같은 동선/순서/인과 연결 문장을 절대 임의로 만들어내지 마라.
+(이미 RAW_CONTEXT에 그런 동선이 명시된 경우에만 자연스럽게 사용 가능)
+
+장소 키워드(가능성)는 “위치/근처/접근성” 문장에서 짧게 1번만 언급하고 끝내라.
+
+‘국물/면/온도/감칠맛’ 같은 소재 키워드는 “맛/식감” 파트에서만 사용해라.
+
+프로모션 키워드는 문장 단조로움 방지용이다.
+
+무조건 다 쓰지 말고 1~3개만 골라
+
+“형용사 나열”처럼 보이지 않게, 맛/분위기/컨디션 중 한 곳에만 녹여라.
+
+문체는 정리체(“전반적으로”, “재방문 의사”)를 피하고, 사람 후기 말투로 작성해라.
+
+길이는 6~9문장. 마지막은 딱딱한 결론 대신 “다음에 또 올 듯/추천”처럼 자연스럽게 마무리.
+
+서로 다른 장소 키워드가 2개 이상 있을 때, 두 장소를 한 문장에 함께 넣지 마라.
+장소 키워드는 “동선”이 아니라 “그 지역에서 떠오르는/근처”처럼 독립적으로만 언급하라.
+
+출력
+
+완성된 리뷰 텍스트만 출력.
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)
@@ -375,7 +380,7 @@ ${sideText ? `- 함께 먹은 것: ${sideText}` : ""}
 ${keywordsSection ? keywordsSection + "\n" : ""}
 
 [작성 규칙]
-1. 길이: 각 리뷰 150~380자 (3문장)
+1. 문장 수: 각 리뷰 6~9문장
 2. 비문 절대 금지: "국물했어요", "어국수했어요" 같은 패턴
 3. 반복 금지: ${forbiddenPhrases.slice(0, 3).join(", ")} 같은 문구 사용 금지
 4. 3개 리뷰는 서로 다른 톤
@@ -504,14 +509,22 @@ function validateReviews(reviews, keywordsList, originalKeywords = [], requiredK
 
     const length = review.length;
 
-    // 길이 검증 (150~380자 범위)
-    if (length < 150 || length > 380) {
-      errors.push(`리뷰 ${index + 1} 길이 부적절 (${length}자, 허용: 150~380자)`);
+    // 문장 수 검증 (6~9문장)
+    const sentenceCount = countSentences(review);
+    if (sentenceCount < 6 || sentenceCount > 9) {
+      errors.push(`리뷰 ${index + 1} 문장 수가 범위를 벗어남 (현재: ${sentenceCount}문장, 허용: 6~9문장)`);
     }
 
-    // 문장 수 검증 (3문장)
-    if (countSentences(review) !== 3) {
-      errors.push(`리뷰 ${index + 1} 문장 수가 3이 아님 (현재: ${countSentences(review)}문장)`);
+    // 장소 키워드가 한 문장에 2개 이상 들어가는지 확인
+    const locationKeywords = (requiredKeywords || []).filter(isLocationKeyword);
+    if (locationKeywords.length > 1) {
+      const sentences = splitSentences(review);
+      sentences.forEach((sentence) => {
+        const hitCount = locationKeywords.filter((kw) => sentence.includes(kw)).length;
+        if (hitCount > 1) {
+          errors.push(`리뷰 ${index + 1}에 장소 키워드가 한 문장에 2개 이상 포함됨`);
+        }
+      });
     }
 
     // 필수 키워드 검증: 100% 포함 필수

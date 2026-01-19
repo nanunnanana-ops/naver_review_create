@@ -104,8 +104,8 @@ async function handleGenerate() {
     ...selectedMenus
   ];
 
-  // 프로모션 키워드 풀에서 랜덤 2~4개 선택
-  const promoCount = Math.floor(Math.random() * 3) + 2; // 2~4개
+  // 프로모션 키워드 풀에서 랜덤 1~3개 선택
+  const promoCount = Math.floor(Math.random() * 3) + 1; // 1~3개
   const shuffledPromo = [...config.promoKeywordsPool].sort(() => Math.random() - 0.5);
   keywordsBundle.push(...shuffledPromo.slice(0, promoCount));
 
@@ -149,6 +149,7 @@ async function handleGenerate() {
         sides: selectedSides,
         keywordsBundle: keywordsBundle,
         requiredKeywords: config.requiredKeywords || [], // 필수 키워드 별도 전송
+        promoKeywordsPool: config.promoKeywordsPool || [],
         targetLength: 260, // 150~380글자 내외
         nonce: nonce
       };

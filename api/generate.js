@@ -71,19 +71,24 @@ export default async function handler(req, res) {
         ? convertKeywordsToPhrases(effectiveRequiredKeywords)
         : [];
       const requiredKeywordsText = requiredKeywordsPhrases.join(", ");
-      reviews = await generateWithGroq(
-        menuText,
-        sideText,
-        keywordsText,
-        keywordsPhrases,
-        originalKeywords,
-        effectiveRequiredKeywords,
-        requiredKeywordsText,
-        promoPool,
-        storeName,
-        targetLength,
-        groqKey
-      );
+      try {
+        reviews = await generateWithGroq(
+          menuText,
+          sideText,
+          keywordsText,
+          keywordsPhrases,
+          originalKeywords,
+          effectiveRequiredKeywords,
+          requiredKeywordsText,
+          promoPool,
+          storeName,
+          targetLength,
+          groqKey
+        );
+      } catch (error) {
+        console.error("Groq 호출 실패, 템플릿 폴백 사용:", error);
+        reviews = generateFallbackReviews(menuText, sideText, keywordsBundle || [], storeName);
+      }
     } else {
       // API 키가 없으면 템플릿 기반 생성 (폴백)
       console.warn("API 키가 없어 템플릿 기반 생성 사용");

@@ -376,7 +376,13 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)
-["리뷰1","리뷰2","리뷰3"]`
+["리뷰1","리뷰2","리뷰3"]
+
+추가 톤 규칙:
+1) 리뷰1: 기존처럼 자연스러운 일반 말투
+2) 리뷰2: 음슴체 ("~했음/~임/~좋았음" 등)
+3) 리뷰3: 반말투 ("~했어/~맛있더라" 등)
+세 리뷰는 어휘/리듬도 다르게.`
       : `네이버 영수증 리뷰 3개를 작성해줘.
 
 [필수 조건]
@@ -393,7 +399,13 @@ ${keywordsSection ? keywordsSection + "\n" : ""}
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)
-["리뷰1","리뷰2","리뷰3"]`;
+["리뷰1","리뷰2","리뷰3"]
+
+추가 톤 규칙:
+1) 리뷰1: 기존처럼 자연스러운 일반 말투
+2) 리뷰2: 음슴체 ("~했음/~임/~좋았음" 등)
+3) 리뷰3: 반말투 ("~했어/~맛있더라" 등)
+세 리뷰는 어휘/리듬도 다르게.`; 
 
     try {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {

@@ -184,11 +184,22 @@ function ensureCompleteSentences(reviews) {
     let text = review.trim();
     // 말줄임표 제거
     text = text.replace(/\.{2,}|…/g, ".");
+    // 어색한 종결 보정
+    text = text.replace(/싶니(?=[\s\.\!?\)]|$)/g, "싶어요");
 
     // 문장 끝이 완결이 아니면 마무리
     if (!/[.!?]$/.test(text)) {
       text = `${text}요.`;
     }
+    // 문장 단위로 "니" 종결을 "요"로 보정
+    const sentences = splitSentences(text).map((s) => {
+      const trimmed = s.trim();
+      if (/니$/.test(trimmed)) {
+        return trimmed.replace(/니$/, "요");
+      }
+      return trimmed;
+    });
+    text = sentences.join(". ").replace(/\s+\./g, ".").trim();
     return text.replace(/\s+\./g, ".").trim();
   });
 }

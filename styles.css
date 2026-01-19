@@ -110,6 +110,18 @@ body {
   gap: 8px;
 }
 
+.menu-group {
+  margin-bottom: 8px;
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--border);
+  opacity: 0.6;
+  margin: 10px 0 14px;
+  width: 100%;
+}
+
 .checkbox-item {
   position: relative;
 }

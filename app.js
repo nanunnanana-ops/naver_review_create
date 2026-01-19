@@ -28,22 +28,36 @@ function applyConfig() {
   document.documentElement.style.setProperty('--theme-bg', config.ui.themeBg);
   document.documentElement.style.setProperty('--accent', config.ui.accent);
 
-  // 메뉴 체크박스 채우기
+  // 메뉴 체크박스 채우기 (3개 그룹으로 구분)
   const menusGroup = document.getElementById('menusGroup');
   menusGroup.innerHTML = '';
-  config.menus.forEach(menu => {
-    const item = document.createElement('div');
-    item.className = 'checkbox-item';
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = `menu_${menu}`;
-    checkbox.value = menu;
-    const label = document.createElement('label');
-    label.htmlFor = `menu_${menu}`;
-    label.textContent = menu;
-    item.appendChild(checkbox);
-    item.appendChild(label);
-    menusGroup.appendChild(item);
+  const menuGroups = splitIntoGroups(config.menus, 3);
+  menuGroups.forEach((group, index) => {
+    const groupWrap = document.createElement('div');
+    groupWrap.className = 'checkbox-group menu-group';
+
+    group.forEach(menu => {
+      const item = document.createElement('div');
+      item.className = 'checkbox-item';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `menu_${menu}`;
+      checkbox.value = menu;
+      const label = document.createElement('label');
+      label.htmlFor = `menu_${menu}`;
+      label.textContent = menu;
+      item.appendChild(checkbox);
+      item.appendChild(label);
+      groupWrap.appendChild(item);
+    });
+
+    menusGroup.appendChild(groupWrap);
+
+    if (index < menuGroups.length - 1) {
+      const divider = document.createElement('div');
+      divider.className = 'menu-divider';
+      menusGroup.appendChild(divider);
+    }
   });
 
   // 사이드 옵션 채우기
@@ -80,6 +94,15 @@ function setupEventListeners() {
       document.getElementById('copyModal').classList.remove('active');
     }
   });
+}
+
+function splitIntoGroups(items, groupCount) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const groups = Array.from({ length: groupCount }, () => []);
+  items.forEach((item, index) => {
+    groups[index % groupCount].push(item);
+  });
+  return groups.filter(group => group.length > 0);
 }
 
 // ========== 리뷰 생성 ==========

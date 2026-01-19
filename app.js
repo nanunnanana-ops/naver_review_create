@@ -31,7 +31,7 @@ function applyConfig() {
   // 메뉴 체크박스 채우기 (3개 그룹으로 구분)
   const menusGroup = document.getElementById('menusGroup');
   menusGroup.innerHTML = '';
-  const menuGroups = splitIntoGroups(config.menus, 3);
+  const menuGroups = normalizeMenuGroups(config);
   menuGroups.forEach((group, index) => {
     const groupWrap = document.createElement('div');
     groupWrap.className = 'checkbox-group menu-group';
@@ -103,6 +103,13 @@ function splitIntoGroups(items, groupCount) {
     groups[index % groupCount].push(item);
   });
   return groups.filter(group => group.length > 0);
+}
+
+function normalizeMenuGroups(config) {
+  if (Array.isArray(config.menuGroups) && config.menuGroups.some(group => Array.isArray(group) && group.length > 0)) {
+    return config.menuGroups;
+  }
+  return splitIntoGroups(config.menus || [], 3);
 }
 
 // ========== 리뷰 생성 ==========

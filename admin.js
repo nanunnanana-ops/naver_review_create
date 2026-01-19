@@ -88,7 +88,12 @@ function loadConfigToForm() {
   document.getElementById('promoKeywordsPool').value = promoKeywordsValue;
   console.log('프로모션 키워드 필드에 설정된 값:', promoKeywordsValue);
   
-  document.getElementById('menus').value = config.menus.join('\n');
+  const menuGroups = Array.isArray(config.menuGroups) && config.menuGroups.length > 0
+    ? config.menuGroups
+    : splitIntoGroups(config.menus || [], 3);
+  document.getElementById('menusGroup1').value = (menuGroups[0] || []).join('\n');
+  document.getElementById('menusGroup2').value = (menuGroups[1] || []).join('\n');
+  document.getElementById('menusGroup3').value = (menuGroups[2] || []).join('\n');
   document.getElementById('sides').value = config.sides.join(', ');
   document.getElementById('themeBg').value = config.ui.themeBg || '#FDFBF8';
   document.getElementById('accent').value = config.ui.accent || '#C0362C';
@@ -103,11 +108,18 @@ function collectConfigFromForm() {
   const parsedRequired = parseCommaSeparated(requiredKeywordsInput);
   console.log('파싱된 필수 키워드:', parsedRequired);
   
+  const menusGroup1 = parseNewlineOrComma(document.getElementById('menusGroup1').value);
+  const menusGroup2 = parseNewlineOrComma(document.getElementById('menusGroup2').value);
+  const menusGroup3 = parseNewlineOrComma(document.getElementById('menusGroup3').value);
+  const menuGroups = [menusGroup1, menusGroup2, menusGroup3].filter(group => group.length > 0);
+  const flattenedMenus = menuGroups.flat();
+
   const newConfig = {
     storeName: document.getElementById('storeName').value.trim() || DEFAULT_CONFIG.storeName,
     requiredKeywords: parsedRequired,
     promoKeywordsPool: parseCommaSeparated(document.getElementById('promoKeywordsPool').value),
-    menus: parseNewlineOrComma(document.getElementById('menus').value),
+    menus: flattenedMenus,
+    menuGroups: menuGroups,
     sides: parseNewlineOrComma(document.getElementById('sides').value),
     lengthOptions: config.lengthOptions || DEFAULT_CONFIG.lengthOptions,
     ui: {
@@ -130,6 +142,7 @@ function collectConfigFromForm() {
     newConfig.promoKeywordsPool = DEFAULT_CONFIG.promoKeywordsPool;
   }
   if (newConfig.menus.length === 0) {
+    newConfig.menuGroups = DEFAULT_CONFIG.menuGroups;
     newConfig.menus = DEFAULT_CONFIG.menus;
   }
   if (newConfig.sides.length === 0) {
@@ -140,6 +153,15 @@ function collectConfigFromForm() {
   console.log('최종 필수 키워드:', newConfig.requiredKeywords);
 
   return newConfig;
+}
+
+function splitIntoGroups(items, groupCount) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const groups = Array.from({ length: groupCount }, () => []);
+  items.forEach((item, index) => {
+    groups[index % groupCount].push(item);
+  });
+  return groups.filter(group => group.length > 0);
 }
 
 // ========== 로컬 저장 ==========

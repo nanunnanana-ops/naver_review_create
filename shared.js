@@ -20,6 +20,11 @@ const DEFAULT_CONFIG = {
   requiredKeywords: ["서대문역", "국물", "강북삼성병원", "영천시장"],
   promoKeywordsPool: ["시원", "깔끔", "매콤", "국수"],
   menus: ["어묵국수", "얼큰어묵국수", "잔치국수", "소갈비국수", "얼큰소갈비국수", "얼큰바지락국수", "비빔국수", "김치말이국수", "매콤닭발", "매콤제육", "매콤쭈꾸미", "두부김치", "스팸구이계란", "해물김치전", "해물부추전"],
+  menuGroups: [
+    ["어묵국수", "얼큰어묵국수", "잔치국수", "소갈비국수", "얼큰소갈비국수"],
+    ["얼큰바지락국수", "비빔국수", "김치말이국수", "매콤닭발", "매콤제육"],
+    ["매콤쭈꾸미", "두부김치", "스팸구이계란", "해물김치전", "해물부추전"]
+  ],
   sides: ["소주", "맥주", "막걸리", "없음"],
   ui: {
     themeBg: "#FDFBF8",
@@ -81,10 +86,22 @@ function loadConfigFromLocal() {
         menus: (Array.isArray(parsed.menus) && parsed.menus.length > 0)
           ? parsed.menus
           : (parsed.menus !== undefined ? parsed.menus : DEFAULT_CONFIG.menus),
+        menuGroups: (Array.isArray(parsed.menuGroups) && parsed.menuGroups.some(group => Array.isArray(group) && group.length > 0))
+          ? parsed.menuGroups
+          : (parsed.menuGroups !== undefined ? parsed.menuGroups : DEFAULT_CONFIG.menuGroups),
         sides: (Array.isArray(parsed.sides) && parsed.sides.length > 0)
           ? parsed.sides
           : (parsed.sides !== undefined ? parsed.sides : DEFAULT_CONFIG.sides),
       };
+
+      // menuGroups가 비어있고 menus가 있으면 3그룹으로 분할
+      if (!merged.menuGroups || merged.menuGroups.length === 0) {
+        const groups = [[], [], []];
+        merged.menus.forEach((menu, index) => {
+          groups[index % 3].push(menu);
+        });
+        merged.menuGroups = groups.filter(group => group.length > 0);
+      }
       
       // 디버깅: 최종 병합 결과 확인
       console.log('=== 병합 결과 ===');

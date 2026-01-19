@@ -409,10 +409,14 @@ JSON 배열만 출력 (설명 없이)
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`Groq API error: ${errorData}`);
+    if (!response.ok) {
+      const errorData = await response.text();
+      // Rate limit은 템플릿 폴백으로 처리
+      if (response.status === 429 || /rate_limit/i.test(errorData)) {
+        throw new Error("GROQ_RATE_LIMIT");
       }
+      throw new Error(`Groq API error: ${errorData}`);
+    }
 
       const data = await response.json();
       const responseText = data.choices[0]?.message?.content?.trim() || "";
@@ -474,6 +478,10 @@ JSON 배열만 출력 (설명 없이)
       }
     } catch (error) {
       console.error(`Groq API error (시도 ${attempt + 1}/${maxRetries}):`, error);
+      if (String(error.message || "").includes("GROQ_RATE_LIMIT")) {
+        // 바로 폴백 사용
+        return generateFallbackReviews(menuText, sideText, originalKeywords, storeName);
+      }
       if (attempt === maxRetries - 1) {
         throw error;
       }

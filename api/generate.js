@@ -108,6 +108,9 @@ export default async function handler(req, res) {
       reviews = ensureRequiredKeywords(reviews, effectiveRequiredKeywords);
     }
 
+    // 톤 강제 적용 (1: 일반, 2: 음슴체, 3: 반말)
+    reviews = enforceTones(reviews);
+
     return res.status(200).json({ reviews });
   } catch (error) {
     console.error("API error:", error);
@@ -174,6 +177,47 @@ function splitSentences(text) {
 function isLocationKeyword(keyword) {
   const locationHints = ["역", "병원", "시장", "터미널", "공원", "학교", "사거리", "거리", "동", "구", "로", "길"];
   return locationHints.some((hint) => String(keyword).includes(hint));
+}
+
+function enforceTones(reviews) {
+  if (!Array.isArray(reviews)) return reviews;
+  return reviews.map((review, index) => {
+    if (typeof review !== "string") return review;
+    let text = review.trim();
+    if (index === 1) {
+      // 음슴체
+      text = text
+        .replace(/(합니다|했어요|좋았어요|입니다|됩니다|있어요)/g, (m) => {
+          if (m === "합니다") return "함";
+          if (m === "했어요") return "했음";
+          if (m === "좋았어요") return "좋았음";
+          if (m === "입니다") return "임";
+          if (m === "됩니다") return "됨";
+          if (m === "있어요") return "있음";
+          return m;
+        });
+      if (!/(했음|좋았음|임)\.?$/.test(text)) {
+        text = `${text} 맛있게 먹었음.`;
+      }
+    } else if (index === 2) {
+      // 반말
+      text = text
+        .replace(/했어요/g, "했어")
+        .replace(/좋았어요/g, "좋았어")
+        .replace(/입니다/g, "이었어")
+        .replace(/합니다/g, "함")
+        .replace(/있어요/g, "있어")
+        .replace(/됩니다/g, "돼");
+      if (!/(했어|맛있더라|좋더라)\.?$/.test(text)) {
+        text = `${text} 맛있더라.`;
+      }
+    }
+    // 길이 상한 200자 유지
+    if (text.length > 200) {
+      text = text.substring(0, 197).trim() + "...";
+    }
+    return text;
+  });
 }
 
 function buildNaturalKeywordSentence(keyword) {

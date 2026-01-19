@@ -1,5 +1,5 @@
 // templates.js
-// 목적: AI 호출 없이도 자연스러운 네이버 영수증 리뷰 3개 생성
+// 목적: AI 호출 없이도 자연스러운 네이버 영수증 리뷰 2개 생성
 // 원칙: 완성문 저장 X / 슬롯(빈칸) 템플릿 + 조립 + 규칙 기반 치환 O
 
 // =========================
@@ -14,7 +14,7 @@ function shuffle(arr) {
 function uniq(arr) {
   return Array.from(new Set(arr));
 }
-function clampTextLen(text, min = 200, max = 380) {
+function clampTextLen(text, min = 80, max = 200) {
   let t = text.replace(/\s+/g, " ").trim();
   if (t.length < min) {
     const pads = shuffle(PADDING_SENTENCES);
@@ -269,10 +269,10 @@ function buildReview({ storeName = "어국수", menus = [], sides = [], keywords
 // =========================
 // 3) 외부에서 호출할 함수
 // =========================
-function generateReviews({ storeName = "어국수", menus = [], sides = [], keywordsBundle = [], targetLength = 300 }) {
+function generateReviews({ storeName = "어국수", menus = [], sides = [], keywordsBundle = [], targetLength = 140 }) {
   const kw = safeKeywordPack(keywordsBundle);
 
-  // 3개 리뷰 생성 (중복 방지용으로 조금 더 뽑고 unique)
+  // 2개 리뷰 생성 (중복 방지용으로 조금 더 뽑고 unique)
   const candidates = [];
   for (let i = 0; i < 8; i++) {
     candidates.push(
@@ -286,10 +286,10 @@ function generateReviews({ storeName = "어국수", menus = [], sides = [], keyw
     );
   }
 
-  const reviews = uniq(candidates).slice(0, 3);
+  const reviews = uniq(candidates).slice(0, 2);
 
-  // 혹시 3개 미만이면 채우기
-  while (reviews.length < 3) {
+  // 혹시 2개 미만이면 채우기
+  while (reviews.length < 2) {
     reviews.push(buildReview({ storeName, menus, sides, keywords: kw, targetLength }));
   }
 

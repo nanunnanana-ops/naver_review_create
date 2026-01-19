@@ -228,7 +228,7 @@ function showToast(message, duration = 2000) {
 }
 
 // ========== 리뷰 생성 (데모 모드) ==========
-// 35글자 내외로 자연스러운 리뷰 생성
+// 80~200자 내외로 자연스러운 리뷰 생성
 function generateReviewsDemo(storeName, menus, sides, keywordsBundle) {
   // 메뉴 텍스트 생성 (복수 선택 시)
   const menuText = menus.length === 1 ? menus[0] : menus.join('과 ');
@@ -239,7 +239,7 @@ function generateReviewsDemo(storeName, menus, sides, keywordsBundle) {
   // 키워드 풀에서 자연스럽게 사용할 키워드 선택
   const usedKeywords = [...keywordsBundle].sort(() => Math.random() - 0.5);
   
-  // 다양한 말투의 템플릿 (35글자 내외)
+  // 다양한 말투의 템플릿 (80~200자 내외)
   const templates = [
     // 스타일 1: 간단하고 담백한 말투
     () => {
@@ -294,11 +294,11 @@ function generateReviewsDemo(storeName, menus, sides, keywordsBundle) {
     }
   ];
 
-  // 3개의 서로 다른 리뷰 생성
+  // 2개의 서로 다른 리뷰 생성
   const reviews = [];
   const usedIndices = new Set();
-  
-  while (reviews.length < 3) {
+
+  while (reviews.length < 2) {
     let review = '';
     let attempts = 0;
     
@@ -311,8 +311,8 @@ function generateReviewsDemo(storeName, menus, sides, keywordsBundle) {
     usedIndices.add(templateIndex);
     review = templates[templateIndex]();
     
-    // 35글자 내외로 조정
-    review = adjustLength(review, 30, 40);
+    // 80~200자 내외로 조정
+    review = adjustLength(review, 80, 200);
     
     reviews.push(review);
   }

@@ -96,9 +96,9 @@ export default async function handler(req, res) {
       reviews = generateFallbackReviews(menuText, sideText, keywordsBundle || [], storeName);
     }
 
-    // 최소 3개 리뷰 보장 (API 호출 실패 시에만)
-    if (reviews.length < 3) {
-      console.warn("리뷰가 3개 미만, 기본 템플릿 사용");
+    // 최소 2개 리뷰 보장 (API 호출 실패 시에만)
+    if (reviews.length < 2) {
+      console.warn("리뷰가 2개 미만, 기본 템플릿 사용");
       const kb = keywordsBundle || [];
       reviews = generateFallbackReviews(menuText, sideText, kb, storeName);
     }
@@ -107,9 +107,6 @@ export default async function handler(req, res) {
     if (effectiveRequiredKeywords.length > 0) {
       reviews = ensureRequiredKeywords(reviews, effectiveRequiredKeywords);
     }
-
-    // 톤 강제 적용 (1: 일반, 2: 음슴체, 3: 반말)
-    reviews = enforceTones(reviews);
 
     return res.status(200).json({ reviews });
   } catch (error) {
@@ -179,67 +176,6 @@ function isLocationKeyword(keyword) {
   return locationHints.some((hint) => String(keyword).includes(hint));
 }
 
-function enforceTones(reviews) {
-  if (!Array.isArray(reviews)) return reviews;
-  return reviews.map((review, index) => {
-    if (typeof review !== "string") return review;
-    let text = review.trim();
-    if (index === 1) {
-      // 음슴체 (리뷰 전체를 통일)
-      text = toEumSeum(text);
-    } else if (index === 2) {
-      // 반말 (리뷰 전체를 통일)
-      text = toBanmal(text);
-    }
-    // 길이 상한 200자 유지
-    if (text.length > 200) {
-      text = text.substring(0, 197).trim() + "...";
-    }
-    return text;
-  });
-}
-
-function toEumSeum(text) {
-  const sentences = splitSentences(text);
-  const converted = sentences.map((s) => {
-    let t = s.trim();
-    t = t
-      .replace(/습니다/g, "슴")
-      .replace(/합니다/g, "함")
-      .replace(/했어요/g, "했음")
-      .replace(/좋았어요/g, "좋았음")
-      .replace(/입니다/g, "임")
-      .replace(/됩니다/g, "됨")
-      .replace(/있어요/g, "있음")
-      .replace(/예요/g, "임");
-    if (!/(했음|좋았음|임|됨|있음|함|슴)$/.test(t)) {
-      t = `${t}임`;
-    }
-    return `${t}.`;
-  });
-  return converted.join(" ").trim();
-}
-
-function toBanmal(text) {
-  const sentences = splitSentences(text);
-  const converted = sentences.map((s) => {
-    let t = s.trim();
-    t = t
-      .replace(/합니다/g, "해")
-      .replace(/했습니다/g, "했어")
-      .replace(/했어요/g, "했어")
-      .replace(/좋았어요/g, "좋았어")
-      .replace(/입니다/g, "이었어")
-      .replace(/예요/g, "야")
-      .replace(/있어요/g, "있어")
-      .replace(/됩니다/g, "돼");
-    if (!/(했어|좋았어|이었어|있어|돼|야)$/.test(t)) {
-      t = `${t}임`;
-    }
-    return `${t}.`;
-  });
-  return converted.join(" ").trim();
-}
 
 function buildNaturalKeywordSentence(keyword) {
   if (!keyword) return "";
@@ -441,14 +377,8 @@ async function generateWithGroq(menuText, sideText, keywordsText, keywordsPhrase
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)
-["리뷰1","리뷰2","리뷰3"]
-
-추가 톤 규칙:
-1) 리뷰1: 기존처럼 자연스러운 일반 말투
-2) 리뷰2: 음슴체 ("~했음/~임/~좋았음" 등)
-3) 리뷰3: 반말투 ("~했어/~맛있더라" 등)
-세 리뷰는 어휘/리듬도 다르게.`
-      : `네이버 영수증 리뷰 3개를 작성해줘.
+["리뷰1","리뷰2"]`
+      : `네이버 영수증 리뷰 2개를 작성해줘.
 
 [필수 조건]
 - 매장명: ${storeName}
@@ -460,17 +390,11 @@ ${keywordsSection ? keywordsSection + "\n" : ""}
 1. 길이: 각 리뷰 80~200자 (완전한 문장일 필요 없음)
 2. 비문 절대 금지: "국물했어요", "어국수했어요" 같은 패턴
 3. 반복 금지: ${forbiddenPhrases.slice(0, 3).join(", ")} 같은 문구 사용 금지
-4. 3개 리뷰는 서로 다른 톤
+4. 2개 리뷰는 서로 다른 톤
 
 출력 형식:
 JSON 배열만 출력 (설명 없이)
-["리뷰1","리뷰2","리뷰3"]
-
-추가 톤 규칙:
-1) 리뷰1: 기존처럼 자연스러운 일반 말투
-2) 리뷰2: 음슴체 ("~했음/~임/~좋았음" 등)
-3) 리뷰3: 반말투 ("~했어/~맛있더라" 등)
-세 리뷰는 어휘/리듬도 다르게.`; 
+["리뷰1","리뷰2"]`; 
 
     try {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -585,9 +509,9 @@ JSON 배열만 출력 (설명 없이)
 function validateReviews(reviews, keywordsList, originalKeywords = [], requiredKeywords = []) {
   const errors = [];
 
-  // 배열 3개인지 확인
-  if (!Array.isArray(reviews) || reviews.length !== 3) {
-    errors.push(`리뷰가 3개가 아님 (현재: ${reviews?.length || 0}개)`);
+    // 배열 2개인지 확인
+    if (!Array.isArray(reviews) || reviews.length !== 2) {
+      errors.push(`리뷰가 2개가 아님 (현재: ${reviews?.length || 0}개)`);
     return { isValid: false, errors };
   }
 
